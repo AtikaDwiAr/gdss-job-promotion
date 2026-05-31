@@ -1,8 +1,11 @@
 import streamlit as st
 import pandas as pd
 from database.supabase_client import supabase
+from methods.auth import require_login
 
-st.title("📝 Evaluation")
+require_login()
+
+st.title("Evaluation")
 
 # ==========================
 # LOAD USERS
@@ -74,17 +77,23 @@ if len(subcriteria) == 0:
 # DROPDOWN USER
 # ==========================
 
-user_options = {
-    user["name"]: user["id"]
-    for user in users
-}
+is_admin = st.session_state.get("role_name") == "Admin1"
 
-selected_user = st.selectbox(
-    "Decision Maker",
-    list(user_options.keys())
-)
+if is_admin:
+    user_options = {
+        user["name"]: user["id"]
+        for user in users
+    }
 
-user_id = user_options[selected_user]
+    selected_user = st.selectbox(
+        "Decision Maker",
+        list(user_options.keys())
+    )
+
+    user_id = user_options[selected_user]
+else:
+    user_id = st.session_state["user_id"]
+    st.text(f"Decision Maker: {st.session_state['user_name']}")
 
 # ==========================
 # DROPDOWN ALTERNATIVE

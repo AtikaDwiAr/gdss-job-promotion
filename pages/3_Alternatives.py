@@ -1,8 +1,10 @@
 import streamlit as st
 import pandas as pd
 from database.supabase_client import supabase
+from methods.auth import require_login
 
-st.title("👤 Master Alternatives")
+require_login()
+st.title("Alternatives")
 
 # ==========================
 # FORM TAMBAH ALTERNATIVE

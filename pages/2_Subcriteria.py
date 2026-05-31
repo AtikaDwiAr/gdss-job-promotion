@@ -1,8 +1,11 @@
 import streamlit as st
 import pandas as pd
 from database.supabase_client import supabase
+from methods.auth import require_login
 
-st.title("📋 Master Subcriteria")
+require_login()
+
+st.title("Subcriteria")
 
 # ==========================
 # AMBIL DATA CRITERIA

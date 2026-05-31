@@ -3,8 +3,11 @@ import pandas as pd
 
 from database.supabase_client import supabase
 from methods.profile_matching import calculate_profile_matching
+from methods.auth import require_login
 
-st.title("🎯 Profile Matching")
+require_login()
+
+st.title("Profile Matching")
 
 # =====================================
 # LOAD USERS
@@ -33,27 +36,33 @@ if len(users) == 0:
 # PILIH DECISION MAKER
 # =====================================
 
-user_options = {
+is_admin = st.session_state.get("role_name") == "Admin1"
 
-    f"{u['name']} ({u['email']})":
-        u["id"]
+if is_admin:
+    user_options = {
 
-    for u in users
+        f"{u['name']} ({u['email']})":
+            u["id"]
 
-}
+        for u in users
 
-selected_user = st.selectbox(
-    "Decision Maker",
-    list(user_options.keys())
-)
+    }
 
-user_id = user_options[selected_user]
+    selected_user = st.selectbox(
+        "Decision Maker",
+        list(user_options.keys())
+    )
+
+    user_id = user_options[selected_user]
+else:
+    user_id = st.session_state["user_id"]
+    st.text(f"Decision Maker: {st.session_state['user_name']}")
 
 # =====================================
 # HITUNG PROFILE MATCHING
 # =====================================
 
-if st.button("🚀 Hitung Profile Matching"):
+if st.button("Hitung Profile Matching"):
 
     try:
 
@@ -73,7 +82,7 @@ if st.button("🚀 Hitung Profile Matching"):
 
 st.divider()
 
-st.subheader("📋 Profile Matching Detail")
+st.subheader("Profile Matching Detail")
 
 try:
 
@@ -144,7 +153,7 @@ except Exception as e:
 
 st.divider()
 
-st.subheader("📊 Nilai Per Kriteria")
+st.subheader("Nilai Per Kriteria")
 
 try:
 
@@ -216,7 +225,7 @@ except Exception as e:
 
 st.divider()
 
-st.subheader("🏆 Ranking Profile Matching")
+st.subheader("Ranking Profile Matching")
 
 try:
 
