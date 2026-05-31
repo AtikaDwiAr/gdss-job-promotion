@@ -1,7 +1,7 @@
 from database.supabase_client import supabase
 
 try:
-    response = supabase.table("test").select("*").execute()
+    response = supabase.table("roles").select("*").execute()
 
     print("Koneksi Supabase berhasil!")
     print(response.data)
