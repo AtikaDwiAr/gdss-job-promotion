@@ -3,14 +3,17 @@ import pandas as pd
 
 from database.supabase_client import supabase
 from methods.borda import calculate_borda
+from methods.auth import require_login
 
-st.title("🏆 Borda Result")
+require_login()
+
+st.title("Borda Result")
 
 # ==========================
 # BUTTON
 # ==========================
 
-if st.button("🚀 Hitung Borda"):
+if st.button("Hitung Borda"):
 
     try:
 
