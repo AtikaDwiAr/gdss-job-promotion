@@ -1,11 +1,15 @@
 import streamlit as st
 
 from methods.auth import authenticate_user, init_auth_state, set_user_session
+from methods.ui import apply_base_theme
 
 st.set_page_config(
     page_title="GDSS Recruitment System",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
+
+apply_base_theme()
 
 init_auth_state()
 

@@ -2,7 +2,11 @@ import streamlit as st
 import pandas as pd
 from database.supabase_client import supabase
 from methods.auth import require_login
+from methods.ui import apply_base_theme
 
+st.set_page_config(layout="wide", initial_sidebar_state="expanded")
+
+apply_base_theme()
 require_login()
 
 st.title("Criteria")

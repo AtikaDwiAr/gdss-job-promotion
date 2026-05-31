@@ -3,8 +3,12 @@ import pandas as pd
 
 from database.supabase_client import supabase
 from methods.profile_matching import calculate_profile_matching
-from methods.auth import require_login
+from methods.auth import require_login, is_admin_role
+from methods.ui import apply_base_theme
 
+st.set_page_config(layout="wide", initial_sidebar_state="expanded")
+
+apply_base_theme()
 require_login()
 
 st.title("Profile Matching")
@@ -36,7 +40,7 @@ if len(users) == 0:
 # PILIH DECISION MAKER
 # =====================================
 
-is_admin = st.session_state.get("role_name") == "Admin1"
+is_admin = is_admin_role(st.session_state.get("role_name"))
 
 if is_admin:
     user_options = {

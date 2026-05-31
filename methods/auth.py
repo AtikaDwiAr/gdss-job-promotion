@@ -79,6 +79,14 @@ def set_user_session(user):
     st.session_state["role_name"] = user.get("role_name")
 
 
+def is_admin_role(role_name):
+    if role_name is None:
+        return False
+
+    normalized = str(role_name).strip().lower()
+    return normalized in {"admin", "admin1", "admin 1"}
+
+
 def require_login():
     init_auth_state()
 
