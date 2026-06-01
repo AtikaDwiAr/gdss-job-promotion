@@ -79,9 +79,51 @@ def set_user_session(user):
     st.session_state["role_name"] = user.get("role_name")
 
 
+def is_admin_role(role_name):
+    if role_name is None:
+        return False
+
+    normalized = str(role_name).strip().lower()
+    return normalized in {"admin", "admin1", "admin 1"}
+
+
+def is_dm_role(role_name):
+    if role_name is None:
+        return False
+    
+    normalized = str(role_name).strip().lower()
+    return normalized in {"decision maker", "dm", "decision_maker", "decisionmaker"}
+
+
 def require_login():
     init_auth_state()
 
     if not st.session_state["is_authenticated"]:
         st.warning("Silakan login melalui halaman utama.")
         st.stop()
+
+
+def require_admin():
+    require_login()
+    
+    if not is_admin_role(st.session_state.get("role_name")):
+        # st.error("❌ Akses Ditolak: Hanya Admin yang dapat mengakses halaman ini.")
+        st.stop()
+
+
+def require_dm():
+    require_login()
+    
+    if not is_dm_role(st.session_state.get("role_name")):
+        # st.error("❌ Akses Ditolak: Hanya Decision Maker yang dapat mengakses halaman ini.")
+        st.stop()
+
+def logout():
+    """
+    Membersihkan seluruh session state
+    """
+
+    for key in list(st.session_state.keys()):
+        del st.session_state[key]
+
+    init_auth_state()
