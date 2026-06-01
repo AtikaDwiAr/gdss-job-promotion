@@ -2,6 +2,7 @@ import streamlit as st
 
 from database.supabase_client import supabase
 from methods.auth import require_admin
+from methods.session_status import get_dm_evaluation_status
 
 require_admin()
 
@@ -36,27 +37,37 @@ with st.form("add_session_form"):
 if submit:
 
     if not session_code or not session_name:
-        st.error("Session Code dan Session Name wajib diisi")
+
+        st.error(
+            "Session Code dan Session Name wajib diisi"
+        )
 
     else:
 
         try:
 
-            supabase.table(
-                "gdss_sessions"
-            ).insert(
-                {
-                    "session_code": session_code,
-                    "session_name": session_name,
-                    "description": description,
-                    "status": "draft"
-                }
-            ).execute()
+            (
+                supabase
+                .table("gdss_sessions")
+                .insert(
+                    {
+                        "session_code": session_code,
+                        "session_name": session_name,
+                        "description": description,
+                        "status": "draft"
+                    }
+                )
+                .execute()
+            )
 
-            st.success("Session berhasil ditambahkan")
+            st.success(
+                "Session berhasil ditambahkan"
+            )
+
             st.rerun()
 
         except Exception as e:
+
             st.error(str(e))
 
 # =====================================
@@ -104,7 +115,103 @@ else:
                 f"**Description:** {session['description']}"
             )
 
+            # =====================================
+            # STATUS PENILAIAN DM
+            # =====================================
+
+            st.subheader("Status Penilaian DM")
+
+            try:
+
+                statuses = get_dm_evaluation_status(
+                    session["id"]
+                )
+
+                if len(statuses) == 0:
+
+                    st.info(
+                        "Belum ada decision maker atau penilaian."
+                    )
+
+                else:
+
+                    for item in statuses:
+
+                        status_text = (
+                            "Selesai"
+                            if item["completed"]
+                            else "Belum Selesai"
+                        )
+
+                        st.write(
+                            f"DM ID {item['user_id']} : "
+                            f"{item['total_input']}/"
+                            f"{item['total_required']} "
+                            f"({status_text})"
+                        )
+
+            except Exception as e:
+
+                st.error(
+                    f"Gagal mengambil status penilaian: {str(e)}"
+                )
+
             col1, col2 = st.columns(2)
+
+            # =====================================
+            # AUTO COMPLETED SESSION
+            # =====================================
+
+            st.divider()
+
+            if st.button(
+                "Finalisasi Penilaian",
+                key=f"finalize_eval_{session['id']}"
+            ):
+
+                try:
+
+                    statuses = get_dm_evaluation_status(
+                        session["id"]
+                    )
+
+                    all_completed = all(
+                        s["completed"]
+                        for s in statuses
+                    )
+
+                    if not all_completed:
+
+                        st.error(
+                            "Masih ada DM yang belum selesai menilai"
+                        )
+
+                    else:
+
+                        (
+                            supabase
+                            .table("gdss_sessions")
+                            .update(
+                                {
+                                    "status": "completed"
+                                }
+                            )
+                            .eq(
+                                "id",
+                                session["id"]
+                            )
+                            .execute()
+                        )
+
+                        st.success(
+                            "Session berhasil diselesaikan"
+                        )
+
+                        st.rerun()
+
+                except Exception as e:
+
+                    st.error(str(e))
 
             # =====================================
             # UPDATE STATUS
@@ -115,6 +222,7 @@ else:
                 status_options = [
                     "draft",
                     "active",
+                    "completed",
                     "finalized"
                 ]
 
@@ -134,16 +242,20 @@ else:
 
                     try:
 
-                        supabase.table(
-                            "gdss_sessions"
-                        ).update(
-                            {
-                                "status": new_status
-                            }
-                        ).eq(
-                            "id",
-                            session["id"]
-                        ).execute()
+                        (
+                            supabase
+                            .table("gdss_sessions")
+                            .update(
+                                {
+                                    "status": new_status
+                                }
+                            )
+                            .eq(
+                                "id",
+                                session["id"]
+                            )
+                            .execute()
+                        )
 
                         st.success(
                             "Status berhasil diperbarui"
@@ -189,12 +301,16 @@ else:
                                 supabase
                                 .table(table_name)
                                 .select("id")
-                                .eq("session_id", session_id)
+                                .eq(
+                                    "session_id",
+                                    session_id
+                                )
                                 .limit(1)
                                 .execute()
                             )
 
                             if len(result.data) > 0:
+
                                 has_relation = True
                                 break
 
@@ -210,7 +326,10 @@ else:
                                 supabase
                                 .table("gdss_sessions")
                                 .delete()
-                                .eq("id", session_id)
+                                .eq(
+                                    "id",
+                                    session_id
+                                )
                                 .execute()
                             )
 

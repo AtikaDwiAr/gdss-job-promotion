@@ -60,6 +60,18 @@ selected_session = st.selectbox(
 session_id = selected_session["id"]
 
 # =====================================
+# VALIDASI SESSION
+# =====================================
+
+if selected_session["status"] != "completed":
+
+    st.warning(
+        "Session harus completed sebelum Borda dihitung"
+    )
+
+    st.stop()
+
+# =====================================
 # HITUNG BORDA
 # =====================================
 
@@ -75,6 +87,20 @@ if is_admin:
                 session_id
             )
 
+            # =====================================
+            # FINALISASI SESSION
+            # =====================================
+
+            (
+                supabase
+                .table("gdss_sessions")
+                .update({
+                    "status": "finalized"
+                })
+                .eq("id", session_id)
+                .execute()
+            )
+
             st.success(
                 "Perhitungan Borda berhasil"
             )
@@ -88,7 +114,7 @@ if is_admin:
 else:
 
     st.info(
-        "ℹ️ Hanya Admin yang dapat menjalankan perhitungan Borda"
+        "Hanya Admin yang dapat menjalankan perhitungan Borda"
     )
 
 # =====================================

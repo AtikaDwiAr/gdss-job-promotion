@@ -56,7 +56,7 @@ selected_session = st.selectbox(
     "Session",
     sessions,
     format_func=lambda x:
-        f"{x['session_code']} - {x['session_name']}"
+    f"{x['session_code']} - {x['session_name']}"
 )
 
 session_id = selected_session["id"]
@@ -182,21 +182,21 @@ try:
 
                 "Alternative":
 
-                    f"{d['alternatives']['alternative_code']} - "
-                    f"{d['alternatives']['alternative_name']}",
+                f"{d['alternatives']['alternative_code']} - "
+                f"{d['alternatives']['alternative_name']}",
 
                 "Subcriteria":
 
-                    f"{d['subcriteria']['subcriteria_code']} - "
-                    f"{d['subcriteria']['subcriteria_name']}",
+                f"{d['subcriteria']['subcriteria_code']} - "
+                f"{d['subcriteria']['subcriteria_name']}",
 
                 "Gap":
 
-                    d["gap_value"],
+                d["gap_value"],
 
                 "Weight":
 
-                    d["weight_value"]
+                d["weight_value"]
 
             })
 
@@ -266,28 +266,34 @@ try:
 
                 "Alternative":
 
-                    f"{r['alternatives']['alternative_code']} - "
-                    f"{r['alternatives']['alternative_name']}",
+                f"{r['alternatives']['alternative_code']} - "
+                f"{r['alternatives']['alternative_name']}",
 
                 "Criteria":
 
-                    f"{r['criteria']['criteria_code']} - "
-                    f"{r['criteria']['criteria_name']}",
+                f"{r['criteria']['criteria_code']} - "
+                f"{r['criteria']['criteria_name']}",
 
                 "Score":
 
-                    round(
-                        float(
-                            r["criteria_score"]
-                        ),
-                        4
-                    )
+                round(
+                    float(
+                        r["criteria_score"]
+                    ),
+                    4
+                )
 
             })
 
         st.dataframe(
             pd.DataFrame(rows),
             use_container_width=True
+        )
+
+    else:
+
+        st.info(
+            "Belum ada hasil"
         )
 
 except Exception as e:
@@ -314,6 +320,7 @@ try:
         )
         .select("""
             *,
+            users(name),
             alternatives(
                 alternative_code,
                 alternative_name
@@ -342,22 +349,25 @@ try:
 
             rows.append({
 
+                "DM":
+                s["users"]["name"],
+
                 "Ranking":
-                    s["ranking"],
+                s["ranking"],
 
                 "Alternative":
 
-                    f"{s['alternatives']['alternative_code']} - "
-                    f"{s['alternatives']['alternative_name']}",
+                f"{s['alternatives']['alternative_code']} - "
+                f"{s['alternatives']['alternative_name']}",
 
                 "Total Score":
 
-                    round(
-                        float(
-                            s["total_score"]
-                        ),
-                        4
-                    )
+                round(
+                    float(
+                        s["total_score"]
+                    ),
+                    4
+                )
 
             })
 

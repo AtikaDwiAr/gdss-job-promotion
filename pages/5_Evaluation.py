@@ -82,6 +82,17 @@ selected_session = st.selectbox(
 
 session_id = selected_session["id"]
 
+if selected_session["status"] in [
+    "completed",
+    "finalized"
+]:
+
+    st.warning(
+        "Session sudah ditutup."
+    )
+
+    st.stop()
+
 # ==================================
 # LOAD ALTERNATIVES
 # ==================================
