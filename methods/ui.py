@@ -310,3 +310,19 @@ def apply_base_theme():
         """,
         unsafe_allow_html=True
     )
+
+    if not st.session_state.get("is_authenticated"):
+        st.markdown(
+            """
+            <style>
+            section[data-testid="stSidebar"] {
+              display: none;
+            }
+
+            div[data-testid="stSidebarNav"] {
+              display: none;
+            }
+            </style>
+            """,
+            unsafe_allow_html=True
+        )

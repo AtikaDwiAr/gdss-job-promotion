@@ -2,7 +2,7 @@ from database.supabase_client import supabase
 
 
 # =====================================
-# KONVERSI GAP -> BOBOT GAP
+# GAP → BOBOT
 # =====================================
 
 def gap_weight(gap):
@@ -26,32 +26,41 @@ def gap_weight(gap):
 # PROFILE MATCHING
 # =====================================
 
-def calculate_profile_matching(user_id):
+def calculate_profile_matching(
+    session_id,
+    user_id
+):
 
     # =====================================
     # HAPUS HASIL LAMA
     # =====================================
 
-    supabase.table(
-        "profile_matching_detail"
-    ).delete().eq(
-        "user_id",
-        user_id
-    ).execute()
+    (
+        supabase
+        .table("profile_matching_detail")
+        .delete()
+        .eq("session_id", session_id)
+        .eq("user_id", user_id)
+        .execute()
+    )
 
-    supabase.table(
-        "profile_matching_results"
-    ).delete().eq(
-        "user_id",
-        user_id
-    ).execute()
+    (
+        supabase
+        .table("profile_matching_results")
+        .delete()
+        .eq("session_id", session_id)
+        .eq("user_id", user_id)
+        .execute()
+    )
 
-    supabase.table(
-        "profile_matching_summary"
-    ).delete().eq(
-        "user_id",
-        user_id
-    ).execute()
+    (
+        supabase
+        .table("profile_matching_summary")
+        .delete()
+        .eq("session_id", session_id)
+        .eq("user_id", user_id)
+        .execute()
+    )
 
     # =====================================
     # LOAD DATA
@@ -61,6 +70,7 @@ def calculate_profile_matching(user_id):
         supabase
         .table("evaluations")
         .select("*")
+        .eq("session_id", session_id)
         .eq("user_id", user_id)
         .execute()
     ).data
@@ -69,6 +79,8 @@ def calculate_profile_matching(user_id):
         supabase
         .table("criteria")
         .select("*")
+        .eq("session_id", session_id)
+        .order("criteria_code")
         .execute()
     ).data
 
@@ -76,6 +88,7 @@ def calculate_profile_matching(user_id):
         supabase
         .table("subcriteria")
         .select("*")
+        .eq("session_id", session_id)
         .execute()
     ).data
 
@@ -83,11 +96,12 @@ def calculate_profile_matching(user_id):
         supabase
         .table("alternatives")
         .select("*")
+        .eq("session_id", session_id)
         .execute()
     ).data
 
     # =====================================
-    # HITUNG GAP DAN SIMPAN DETAIL
+    # DETAIL GAP
     # =====================================
 
     for ev in evaluations:
@@ -100,36 +114,31 @@ def calculate_profile_matching(user_id):
             None
         )
 
-        if not sub:
+        if sub is None:
             continue
 
-        gap = float(ev["score"]) - float(sub["target_value"])
+        gap = ( float(ev["score"]) - float(sub["target_value"]))
 
         weight = gap_weight(gap)
 
-        supabase.table(
-            "profile_matching_detail"
-        ).insert({
-
-            "user_id":
-                user_id,
-
-            "alternative_id":
-                ev["alternative_id"],
-
-            "subcriteria_id":
-                ev["subcriteria_id"],
-
-            "gap_value":
-                gap,
-
-            "weight_value":
-                weight
-
-        }).execute()
+        (
+            supabase
+            .table("profile_matching_detail")
+            .insert(
+                {
+                    "session_id": session_id,
+                    "user_id": user_id,
+                    "alternative_id": ev["alternative_id"],
+                    "subcriteria_id": ev["subcriteria_id"],
+                    "gap_value": gap,
+                    "weight_value": weight
+                }
+            )
+            .execute()
+        )
 
     # =====================================
-    # HITUNG NILAI PER KRITERIA
+    # NILAI PER KRITERIA
     # =====================================
 
     for alt in alternatives:
@@ -155,11 +164,26 @@ def calculate_profile_matching(user_id):
                 detail = (
 
                     supabase
-                    .table("profile_matching_detail")
+                    .table(
+                        "profile_matching_detail"
+                    )
                     .select("*")
-                    .eq("user_id", user_id)
-                    .eq("alternative_id", alt["id"])
-                    .eq("subcriteria_id", sub["id"])
+                    .eq(
+                        "session_id",
+                        session_id
+                    )
+                    .eq(
+                        "user_id",
+                        user_id
+                    )
+                    .eq(
+                        "alternative_id",
+                        alt["id"]
+                    )
+                    .eq(
+                        "subcriteria_id",
+                        sub["id"]
+                    )
                     .execute()
 
                 ).data
@@ -167,16 +191,13 @@ def calculate_profile_matching(user_id):
                 if len(detail) == 0:
                     continue
 
-                weight = float(
-                    detail[0]["weight_value"]
-                )
+                weight = float( detail[0]["weight_value"])
 
-                if sub["factor_type"] == "core":
+                if (sub["factor_type"] == "core"):
 
                     core_values.append(weight)
 
                 else:
-
                     secondary_values.append(weight)
 
             # ==============================
@@ -201,19 +222,16 @@ def calculate_profile_matching(user_id):
 
             if len(secondary_values) > 0:
 
-                nsf = (
-                    sum(secondary_values)
-                    /
-                    len(secondary_values)
-                )
+                nsf = (sum(secondary_values) /len(secondary_values))
 
             else:
 
                 nsf = 0
 
             # ==============================
-            # NILAI KRITERIA
-            # 60% NCF + 40% NSF
+            # KRITERIA SCORE
+            # 60% CORE
+            # 40% SECONDARY
             # ==============================
 
             criteria_score = (
@@ -226,26 +244,25 @@ def calculate_profile_matching(user_id):
 
             )
 
-            supabase.table(
-                "profile_matching_results"
-            ).insert({
-
-                "user_id":
-                    user_id,
-
-                "alternative_id":
-                    alt["id"],
-
-                "criteria_id":
-                    crt["id"],
-
-                "criteria_score":
-                    criteria_score
-
-            }).execute()
+            (
+                supabase
+                .table(
+                    "profile_matching_results"
+                )
+                .insert(
+                    {
+                        "session_id": session_id,
+                        "user_id": user_id,
+                        "alternative_id": alt["id"],
+                        "criteria_id": crt["id"],
+                        "criteria_score": criteria_score
+                    }
+                )
+                .execute()
+            )
 
     # =====================================
-    # HITUNG TOTAL SCORE
+    # TOTAL SCORE
     # =====================================
 
     summary_data = []
@@ -255,10 +272,22 @@ def calculate_profile_matching(user_id):
         pm_results = (
 
             supabase
-            .table("profile_matching_results")
+            .table(
+                "profile_matching_results"
+            )
             .select("*")
-            .eq("user_id", user_id)
-            .eq("alternative_id", alt["id"])
+            .eq(
+                "session_id",
+                session_id
+            )
+            .eq(
+                "user_id",
+                user_id
+            )
+            .eq(
+                "alternative_id",
+                alt["id"]
+            )
             .execute()
 
         ).data
@@ -268,45 +297,57 @@ def calculate_profile_matching(user_id):
         for result in pm_results:
 
             crt = next(
+
                 (
                     c for c in criteria
-                    if c["id"] == result["criteria_id"]
+                    if c["id"] ==  result["criteria_id"]
                 ),
+
                 None
+
             )
 
-            if not crt:
+            if crt is None:
                 continue
 
             total_score += (
 
-                float(result["criteria_score"])
+                float(
+                    result[
+                        "criteria_score"
+                    ]
+                )
 
                 *
 
-                float(crt["weight"])
+                float(
+                    crt["weight"]
+                )
 
             )
 
-        summary_data.append({
+        summary_data.append(
 
-            "alternative_id":
-                alt["id"],
+            {
+                "alternative_id":
+                    alt["id"],
 
-            "total_score":
-                total_score
+                "total_score":
+                    total_score
+            }
 
-        })
+        )
 
     # =====================================
-    # RANKING
+    # SORTING RANK
     # =====================================
 
     summary_data = sorted(
 
         summary_data,
 
-        key=lambda x: x["total_score"],
+        key=lambda x:
+        x["total_score"],
 
         reverse=True
 
@@ -316,23 +357,29 @@ def calculate_profile_matching(user_id):
 
     for row in summary_data:
 
-        supabase.table(
-            "profile_matching_summary"
-        ).insert({
-
-            "user_id":
-                user_id,
-
-            "alternative_id":
-                row["alternative_id"],
-
-            "total_score":
-                row["total_score"],
-
-            "ranking":
-                ranking
-
-        }).execute()
+        (
+            supabase
+            .table(
+                "profile_matching_summary"
+            )
+            .insert(
+                {
+                    "session_id": session_id,
+                    "user_id": user_id,
+                    "alternative_id":
+                        row[
+                            "alternative_id"
+                        ],
+                    "total_score":
+                        row[
+                            "total_score"
+                        ],
+                    "ranking":
+                        ranking
+                }
+            )
+            .execute()
+        )
 
         ranking += 1
 

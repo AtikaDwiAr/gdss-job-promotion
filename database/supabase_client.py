@@ -7,7 +7,4 @@ load_dotenv()
 url = os.getenv("SUPABASE_URL")
 key = os.getenv("SUPABASE_KEY")
 
-print("URL:", url)
-print("KEY:", key)
-
 supabase = create_client(url, key)

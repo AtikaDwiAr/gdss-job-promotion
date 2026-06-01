@@ -1,6 +1,6 @@
 import streamlit as st
 
-from methods.auth import authenticate_user, init_auth_state, set_user_session
+from methods.auth import authenticate_user, init_auth_state, set_user_session, logout
 from methods.ui import apply_base_theme
 
 st.set_page_config(
@@ -34,5 +34,21 @@ if not st.session_state["is_authenticated"]:
             st.rerun()
 
     st.stop()
+
+with st.sidebar:
+
+    st.success(
+        f"👤 {st.session_state['user_name']}"
+    )
+
+    st.write(
+        f"Role ID : {st.session_state['role_id']}"
+    )
+
+    if st.button("Logout"):
+
+        logout()
+
+        st.rerun()
 
 st.write(f"Selamat datang, {st.session_state['user_name']}")

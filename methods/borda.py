@@ -3,28 +3,33 @@ from collections import defaultdict
 from database.supabase_client import supabase
 
 
-def calculate_borda():
+def calculate_borda(session_id):
 
-    # ==========================
-    # HAPUS HASIL LAMA
-    # ==========================
+    # =====================================
+    # HAPUS HASIL BORDA SESSION INI
+    # =====================================
 
-    supabase.table(
-        "borda_results"
-    ).delete().neq(
-        "id",
-        0
-    ).execute()
+    (
+        supabase
+        .table("borda_results")
+        .delete()
+        .eq("session_id", session_id)
+        .execute()
+    )
 
-    # ==========================
-    # LOAD DATA
-    # ==========================
+    # =====================================
+    # LOAD PROFILE MATCHING SUMMARY
+    # =====================================
 
     summary = (
 
         supabase
         .table("profile_matching_summary")
         .select("*")
+        .eq(
+            "session_id",
+            session_id
+        )
         .execute()
 
     ).data
@@ -33,24 +38,34 @@ def calculate_borda():
 
         return False
 
-    # ==========================
-    # JUMLAH ALTERNATIF
-    # ==========================
+    # =====================================
+    # LOAD ALTERNATIVES
+    # =====================================
 
     alternatives = (
 
         supabase
         .table("alternatives")
         .select("*")
+        .eq(
+            "session_id",
+            session_id
+        )
         .execute()
 
     ).data
 
-    total_alternative = len(alternatives)
+    total_alternative = len(
+        alternatives
+    )
 
-    # ==========================
-    # BORDA POINT
-    # ==========================
+    if total_alternative == 0:
+
+        return False
+
+    # =====================================
+    # HITUNG BORDA
+    # =====================================
 
     borda_scores = defaultdict(float)
 
@@ -60,11 +75,13 @@ def calculate_borda():
 
         user_id = row["user_id"]
 
-        voter_set.add(user_id)
+        alternative_id = row[
+            "alternative_id"
+        ]
 
         ranking = row["ranking"]
 
-        alternative_id = row["alternative_id"]
+        voter_set.add(user_id)
 
         point = (
 
@@ -84,9 +101,9 @@ def calculate_borda():
             alternative_id
         ] += point
 
-    # ==========================
+    # =====================================
     # SORTING
-    # ==========================
+    # =====================================
 
     sorted_result = sorted(
 
@@ -98,31 +115,37 @@ def calculate_borda():
 
     )
 
-    # ==========================
-    # SAVE
-    # ==========================
+    # =====================================
+    # SAVE RESULT
+    # =====================================
 
     rank = 1
 
     for alternative_id, score in sorted_result:
 
-        supabase.table(
-            "borda_results"
-        ).insert({
+        (
+            supabase
+            .table("borda_results")
+            .insert(
+                {
+                    "session_id":
+                        session_id,
 
-            "alternative_id":
-                alternative_id,
+                    "alternative_id":
+                        alternative_id,
 
-            "borda_score":
-                score,
+                    "borda_score":
+                        score,
 
-            "voter_count":
-                len(voter_set),
+                    "voter_count":
+                        len(voter_set),
 
-            "final_ranking":
-                rank
-
-        }).execute()
+                    "final_ranking":
+                        rank
+                }
+            )
+            .execute()
+        )
 
         rank += 1
 

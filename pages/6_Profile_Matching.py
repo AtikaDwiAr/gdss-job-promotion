@@ -3,26 +3,42 @@ import pandas as pd
 
 from database.supabase_client import supabase
 from methods.profile_matching import calculate_profile_matching
-from methods.auth import require_login, is_admin_role
+from methods.auth import (
+    require_login,
+    is_admin_role,
+    is_dm_role
+)
 from methods.ui import apply_base_theme
 
-st.set_page_config(layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
 apply_base_theme()
 require_login()
 
+is_admin = is_admin_role(
+    st.session_state.get("role_name")
+)
+
+is_dm = is_dm_role(
+    st.session_state.get("role_name")
+)
+
 st.title("Profile Matching")
 
 # =====================================
-# LOAD USERS
+# SESSION
 # =====================================
 
 try:
 
-    users = (
+    sessions = (
         supabase
-        .table("users")
+        .table("gdss_sessions")
         .select("*")
+        .order("session_code")
         .execute()
     ).data
 
@@ -31,25 +47,37 @@ except Exception as e:
     st.error(e)
     st.stop()
 
-if len(users) == 0:
+if len(sessions) == 0:
 
-    st.warning("Belum ada data user")
+    st.warning("Belum ada session")
     st.stop()
 
-# =====================================
-# PILIH DECISION MAKER
-# =====================================
+selected_session = st.selectbox(
+    "Session",
+    sessions,
+    format_func=lambda x:
+        f"{x['session_code']} - {x['session_name']}"
+)
 
-is_admin = is_admin_role(st.session_state.get("role_name"))
+session_id = selected_session["id"]
+
+# =====================================
+# USER
+# =====================================
 
 if is_admin:
+
+    users = (
+        supabase
+        .table("users")
+        .select("*")
+        .execute()
+    ).data
+
     user_options = {
-
         f"{u['name']} ({u['email']})":
-            u["id"]
-
+        u["id"]
         for u in users
-
     }
 
     selected_user = st.selectbox(
@@ -57,43 +85,70 @@ if is_admin:
         list(user_options.keys())
     )
 
-    user_id = user_options[selected_user]
+    user_id = user_options[
+        selected_user
+    ]
+
+elif is_dm:
+
+    user_id = st.session_state[
+        "user_id"
+    ]
+
+    st.info(
+        f"Decision Maker : "
+        f"{st.session_state['user_name']}"
+    )
+
 else:
-    user_id = st.session_state["user_id"]
-    st.text(f"Decision Maker: {st.session_state['user_name']}")
+
+    st.stop()
 
 # =====================================
-# HITUNG PROFILE MATCHING
+# HITUNG PM
 # =====================================
 
-if st.button("Hitung Profile Matching"):
+if is_admin:
 
-    try:
+    if st.button(
+        "Hitung Profile Matching"
+    ):
 
-        calculate_profile_matching(user_id)
+        try:
 
-        st.success(
-            "Perhitungan Profile Matching berhasil"
-        )
+            calculate_profile_matching(
+                session_id,
+                user_id
+            )
 
-    except Exception as e:
+            st.success(
+                "Perhitungan berhasil"
+            )
 
-        st.error(e)
+            st.rerun()
+
+        except Exception as e:
+
+            st.error(e)
 
 # =====================================
-# DETAIL GAP
+# DETAIL
 # =====================================
 
 st.divider()
 
-st.subheader("Profile Matching Detail")
+st.subheader(
+    "Profile Matching Detail"
+)
 
 try:
 
     detail = (
 
         supabase
-        .table("profile_matching_detail")
+        .table(
+            "profile_matching_detail"
+        )
         .select("""
             *,
             alternatives(
@@ -105,7 +160,14 @@ try:
                 subcriteria_name
             )
         """)
-        .eq("user_id", user_id)
+        .eq(
+            "session_id",
+            session_id
+        )
+        .eq(
+            "user_id",
+            user_id
+        )
         .execute()
 
     ).data
@@ -145,26 +207,32 @@ try:
 
     else:
 
-        st.info("Belum ada hasil")
+        st.info(
+            "Belum ada hasil"
+        )
 
 except Exception as e:
 
     st.error(e)
 
 # =====================================
-# HASIL PER KRITERIA
+# RESULT
 # =====================================
 
 st.divider()
 
-st.subheader("Nilai Per Kriteria")
+st.subheader(
+    "Nilai Per Criteria"
+)
 
 try:
 
     results = (
 
         supabase
-        .table("profile_matching_results")
+        .table(
+            "profile_matching_results"
+        )
         .select("""
             *,
             alternatives(
@@ -176,7 +244,14 @@ try:
                 criteria_name
             )
         """)
-        .eq("user_id", user_id)
+        .eq(
+            "session_id",
+            session_id
+        )
+        .eq(
+            "user_id",
+            user_id
+        )
         .execute()
 
     ).data
@@ -199,7 +274,7 @@ try:
                     f"{r['criteria']['criteria_code']} - "
                     f"{r['criteria']['criteria_name']}",
 
-                "Criteria Score":
+                "Score":
 
                     round(
                         float(
@@ -215,10 +290,6 @@ try:
             use_container_width=True
         )
 
-    else:
-
-        st.info("Belum ada hasil")
-
 except Exception as e:
 
     st.error(e)
@@ -229,14 +300,18 @@ except Exception as e:
 
 st.divider()
 
-st.subheader("Ranking Profile Matching")
+st.subheader(
+    "Ranking Profile Matching"
+)
 
 try:
 
     summary = (
 
         supabase
-        .table("profile_matching_summary")
+        .table(
+            "profile_matching_summary"
+        )
         .select("""
             *,
             alternatives(
@@ -244,10 +319,16 @@ try:
                 alternative_name
             )
         """)
-        .eq("user_id", user_id)
+        .eq(
+            "session_id",
+            session_id
+        )
+        .eq(
+            "user_id",
+            user_id
+        )
         .order(
-            "ranking",
-            desc=False
+            "ranking"
         )
         .execute()
 
@@ -262,7 +343,6 @@ try:
             rows.append({
 
                 "Ranking":
-
                     s["ranking"],
 
                 "Alternative":
@@ -295,7 +375,9 @@ try:
 
     else:
 
-        st.info("Belum ada hasil")
+        st.info(
+            "Belum ada hasil"
+        )
 
 except Exception as e:
 
