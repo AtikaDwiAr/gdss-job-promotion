@@ -132,14 +132,6 @@ if is_admin:
             ["core", "secondary"]
         )
 
-        weight = st.number_input(
-            "Weight",
-            min_value=0.0,
-            max_value=1.0,
-            value=0.0,
-            step=0.01
-        )
-
         submit = st.form_submit_button(
             "Simpan"
         )
@@ -161,7 +153,6 @@ if is_admin:
                     "subcriteria_name": subcriteria_name,
                     "target_value": target_value,
                     "factor_type": factor_type,
-                    "weight": weight,
                     "session_id": session_id
                 }
             ).execute()
@@ -202,7 +193,6 @@ try:
             subcriteria_name,
             target_value,
             factor_type,
-            weight,
             criteria(
                 criteria_code,
                 criteria_name
@@ -232,7 +222,6 @@ try:
                     ),
                     "Target": item["target_value"],
                     "Factor": item["factor_type"],
-                    "Weight": item["weight"]
                 }
             )
 
