@@ -2,8 +2,16 @@ import streamlit as st
 import pandas as pd
 
 from database.supabase_client import supabase
-from methods.auth import require_login, is_admin_role
+from methods.auth import (
+    require_login,
+    is_admin_role
+)
 from methods.ui import apply_base_theme
+from methods.navigation import render_navigation
+
+# ==================================
+# PAGE CONFIG
+# ==================================
 
 st.set_page_config(
     layout="wide",
@@ -13,6 +21,8 @@ st.set_page_config(
 apply_base_theme()
 require_login()
 
+render_navigation()
+
 is_admin = is_admin_role(
     st.session_state.get("role_name")
 )
@@ -20,7 +30,7 @@ is_admin = is_admin_role(
 st.title("Criteria")
 
 # ==================================
-# PILIH SESSION
+# LOAD SESSION
 # ==================================
 
 try:
@@ -43,14 +53,14 @@ except Exception as e:
 if len(sessions) == 0:
 
     st.warning(
-        "Belum ada session. Silakan buat session terlebih dahulu."
+        "Belum ada session."
     )
 
     st.stop()
 
 selected_session = st.selectbox(
     "Pilih Session",
-    options=sessions,
+    sessions,
     format_func=lambda x:
         f"{x['session_code']} - {x['session_name']}"
 )
@@ -58,19 +68,27 @@ selected_session = st.selectbox(
 session_id = selected_session["id"]
 
 # ==================================
-# TOTAL BOBOT
+# LOAD CRITERIA
 # ==================================
 
-criteria_response = (
-    supabase
-    .table("criteria")
-    .select("*")
-    .eq("session_id", session_id)
-    .order("criteria_code")
-    .execute()
-)
+try:
 
-criteria_data = criteria_response.data
+    criteria_data = (
+        supabase
+        .table("criteria")
+        .select("*")
+        .eq(
+            "session_id",
+            session_id
+        )
+        .order("criteria_code")
+        .execute()
+    ).data
+
+except Exception as e:
+
+    st.error(e)
+    st.stop()
 
 total_weight = sum(
     float(row["weight"])
@@ -82,100 +100,299 @@ st.info(
 )
 
 # ==================================
-# FORM TAMBAH CRITERIA
+# TABS
 # ==================================
 
 if is_admin:
 
-    st.subheader("Tambah Criteria")
+    tab1, tab2, tab3, tab4 = st.tabs([
+        "Daftar Criteria",
+        "Tambah",
+        "Edit",
+        "Hapus"
+    ])
 
-    with st.form("criteria_form"):
+else:
 
-        criteria_code = st.text_input(
-            "Kode Criteria",
-            placeholder="KA1"
+    tab1 = st.container()
+
+# ==================================
+# TAB DAFTAR
+# ==================================
+
+with tab1:
+
+    st.subheader(
+        "Daftar Criteria"
+    )
+
+    if len(criteria_data) == 0:
+
+        st.info(
+            "Belum ada criteria"
         )
 
-        criteria_name = st.text_input(
-            "Nama Criteria",
-            placeholder="Kecerdasan"
+    else:
+
+        df = pd.DataFrame(
+            criteria_data
         )
 
-        weight = st.number_input(
-            "Bobot",
-            min_value=0.0,
-            max_value=1.0,
-            step=0.01
+        st.dataframe(
+            df[
+                [
+                    "criteria_code",
+                    "criteria_name",
+                    "weight"
+                ]
+            ],
+            use_container_width=True
         )
 
-        submit = st.form_submit_button(
-            "Simpan"
+# ==================================
+# ADMIN ONLY
+# ==================================
+
+if is_admin:
+
+    # =============================
+    # TAB TAMBAH
+    # =============================
+
+    with tab2:
+
+        st.subheader(
+            "Tambah Criteria"
         )
 
-    if submit:
+        with st.form(
+            "add_criteria_form"
+        ):
 
-        if total_weight + weight > 1:
+            criteria_code = st.text_input(
+                "Kode Criteria",
+                placeholder="Kode"
+            )
 
-            st.error(
-                "Total bobot tidak boleh melebihi 1.0"
+            criteria_name = st.text_input(
+                "Nama Criteria",
+                placeholder="Kriteria"
+            )
+
+            weight = st.number_input(
+                "Bobot",
+                min_value=0.0,
+                max_value=1.0,
+                step=0.01
+            )
+
+            submit = st.form_submit_button(
+                "Simpan"
+            )
+
+        if submit:
+
+            if total_weight + weight > 1:
+
+                st.error(
+                    "Total bobot tidak boleh melebihi 1"
+                )
+
+            else:
+
+                try:
+
+                    supabase.table(
+                        "criteria"
+                    ).insert({
+
+                        "criteria_code":
+                        criteria_code,
+
+                        "criteria_name":
+                        criteria_name,
+
+                        "weight":
+                        weight,
+
+                        "session_id":
+                        session_id
+
+                    }).execute()
+
+                    st.success(
+                        "Criteria berhasil ditambahkan"
+                    )
+
+                    st.rerun()
+
+                except Exception as e:
+
+                    st.error(e)
+
+    # =============================
+    # TAB EDIT
+    # =============================
+
+    with tab3:
+
+        st.subheader(
+            "Edit Criteria"
+        )
+
+        if len(criteria_data) == 0:
+
+            st.info(
+                "Belum ada data"
             )
 
         else:
 
-            try:
+            selected = st.selectbox(
+                "Pilih Criteria",
+                criteria_data,
+                format_func=lambda x:
+                    f"{x['criteria_code']} - {x['criteria_name']}"
+            )
 
-                supabase.table(
-                    "criteria"
-                ).insert(
-                    {
-                        "criteria_code": criteria_code,
-                        "criteria_name": criteria_name,
-                        "weight": weight,
-                        "session_id": session_id
-                    }
-                ).execute()
+            with st.form(
+                "edit_criteria_form"
+            ):
 
-                st.success(
-                    "Criteria berhasil ditambahkan"
+                edit_code = st.text_input(
+                    "Kode Criteria",
+                    value=selected[
+                        "criteria_code"
+                    ]
                 )
 
-                st.rerun()
+                edit_name = st.text_input(
+                    "Nama Criteria",
+                    value=selected[
+                        "criteria_name"
+                    ]
+                )
 
-            except Exception as e:
+                edit_weight = st.number_input(
+                    "Bobot",
+                    min_value=0.0,
+                    max_value=1.0,
+                    value=float(
+                        selected[
+                            "weight"
+                        ]
+                    ),
+                    step=0.01
+                )
 
-                st.error(e)
+                update_btn = (
+                    st.form_submit_button(
+                        "Update"
+                    )
+                )
 
-else:
+            if update_btn:
 
-    st.info(
-        "Hanya Admin yang dapat menambah Criteria"
-    )
+                try:
 
-# ==================================
-# DAFTAR CRITERIA
-# ==================================
+                    other_weight = sum(
+                        float(
+                            row["weight"]
+                        )
+                        for row in criteria_data
+                        if row["id"]
+                        != selected["id"]
+                    )
 
-st.divider()
+                    if (
+                        other_weight
+                        + edit_weight
+                        > 1
+                    ):
 
-st.subheader("Daftar Criteria")
+                        st.error(
+                            "Total bobot tidak boleh melebihi 1"
+                        )
 
-if len(criteria_data) == 0:
+                    else:
 
-    st.info(
-        "Belum ada criteria."
-    )
+                        supabase.table(
+                            "criteria"
+                        ).update({
 
-else:
+                            "criteria_code":
+                            edit_code,
 
-    df = pd.DataFrame(criteria_data)
+                            "criteria_name":
+                            edit_name,
 
-    st.dataframe(
-        df[
-            [
-                "criteria_code",
-                "criteria_name",
-                "weight"
-            ]
-        ],
-        use_container_width=True
-    )
+                            "weight":
+                            edit_weight
+
+                        }).eq(
+                            "id",
+                            selected["id"]
+                        ).execute()
+
+                        st.success(
+                            "Criteria berhasil diupdate"
+                        )
+
+                        st.rerun()
+
+                except Exception as e:
+
+                    st.error(e)
+
+    # =============================
+    # TAB HAPUS
+    # =============================
+
+    with tab4:
+
+        st.subheader(
+            "Hapus Criteria"
+        )
+
+        if len(criteria_data) == 0:
+
+            st.info(
+                "Belum ada data"
+            )
+
+        else:
+
+            selected_delete = st.selectbox(
+                "Pilih Criteria",
+                criteria_data,
+                format_func=lambda x:
+                    f"{x['criteria_code']} - {x['criteria_name']}",
+                key="delete_criteria"
+            )
+
+            st.warning(
+                "Data yang dihapus tidak dapat dikembalikan."
+            )
+
+            if st.button(
+                "Hapus Criteria"
+            ):
+
+                try:
+
+                    supabase.table(
+                        "criteria"
+                    ).delete().eq(
+                        "id",
+                        selected_delete["id"]
+                    ).execute()
+
+                    st.success(
+                        "Criteria berhasil dihapus"
+                    )
+
+                    st.rerun()
+
+                except Exception as e:
+
+                    st.error(e)

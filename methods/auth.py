@@ -96,12 +96,26 @@ def is_dm_role(role_name):
 
 
 def require_login():
+
     init_auth_state()
 
     if not st.session_state["is_authenticated"]:
-        st.warning("Silakan login melalui halaman utama.")
-        st.stop()
 
+        st.warning(
+            "Sesi login tidak ditemukan atau telah berakhir."
+        )
+
+        st.info(
+            "Silakan login melalui halaman login."
+        )
+
+        if st.button(
+            "Kembali ke Halaman Login",
+            key="back_to_home"
+        ):
+            st.switch_page("app.py")
+
+        st.stop()
 
 def require_admin():
     require_login()

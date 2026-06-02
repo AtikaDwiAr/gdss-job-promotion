@@ -4,6 +4,7 @@ import pandas as pd
 from database.supabase_client import supabase
 from methods.auth import require_login, is_admin_role
 from methods.ui import apply_base_theme
+from methods.navigation import render_navigation
 
 st.set_page_config(
     layout="wide",
@@ -12,6 +13,8 @@ st.set_page_config(
 
 apply_base_theme()
 require_login()
+
+render_navigation()
 
 is_admin = is_admin_role(
     st.session_state.get("role_name")
@@ -88,167 +91,400 @@ if len(criteria_data) == 0:
     st.stop()
 
 # ==================================
-# FORM TAMBAH SUBCRITERIA
+# LOAD SUBCRITERIA
 # ==================================
-
-if is_admin:
-
-    st.divider()
-
-    st.subheader("Tambah Subcriteria")
-
-    criteria_options = {
-        f"{c['criteria_code']} - {c['criteria_name']}": c["id"]
-        for c in criteria_data
-    }
-
-    with st.form("subcriteria_form"):
-
-        selected_criteria = st.selectbox(
-            "Criteria",
-            options=list(criteria_options.keys())
-        )
-
-        subcriteria_code = st.text_input(
-            "Kode Subcriteria",
-            placeholder="K1"
-        )
-
-        subcriteria_name = st.text_input(
-            "Nama Subcriteria",
-            placeholder="IQ Test"
-        )
-
-        target_value = st.number_input(
-            "Target Value",
-            min_value=1.0,
-            max_value=5.0,
-            value=3.0,
-            step=1.0
-        )
-
-        factor_type = st.selectbox(
-            "Factor Type",
-            ["core", "secondary"]
-        )
-
-        weight = st.number_input(
-            "Weight",
-            min_value=0.0,
-            max_value=1.0,
-            value=0.0,
-            step=0.01
-        )
-
-        submit = st.form_submit_button(
-            "Simpan"
-        )
-
-    if submit:
-
-        try:
-
-            criteria_id = criteria_options[
-                selected_criteria
-            ]
-
-            supabase.table(
-                "subcriteria"
-            ).insert(
-                {
-                    "subcriteria_code": subcriteria_code,
-                    "criteria_id": criteria_id,
-                    "subcriteria_name": subcriteria_name,
-                    "target_value": target_value,
-                    "factor_type": factor_type,
-                    "weight": weight,
-                    "session_id": session_id
-                }
-            ).execute()
-
-            st.success(
-                "Subcriteria berhasil disimpan"
-            )
-
-            st.rerun()
-
-        except Exception as e:
-
-            st.error(f"Error: {e}")
-
-else:
-
-    st.info(
-        "ℹ️ Hanya Admin yang dapat menambah Subcriteria"
-    )
-
-# ==================================
-# DAFTAR SUBCRITERIA
-# ==================================
-
-st.divider()
-
-st.subheader("Daftar Subcriteria")
 
 try:
 
     response = (
         supabase
         .table("subcriteria")
-        .select(
-            """
-            id,
-            subcriteria_code,
-            subcriteria_name,
-            target_value,
-            factor_type,
-            weight,
+        .select("""
+            *,
             criteria(
                 criteria_code,
                 criteria_name
             )
-            """
+        """)
+        .eq(
+            "session_id",
+            session_id
         )
-        .eq("session_id", session_id)
-        .order("subcriteria_code")
+        .order(
+            "subcriteria_code"
+        )
         .execute()
     )
 
-    data = response.data
+    subcriteria_data = response.data
 
-    if len(data) > 0:
+except Exception as e:
 
-        rows = []
+    st.error(e)
+    st.stop()
 
-        for item in data:
+# ==================================
+# TABS
+# ==================================
 
-            rows.append(
-                {
-                    "Kode": item["subcriteria_code"],
-                    "Nama": item["subcriteria_name"],
-                    "Criteria": (
-                        f"{item['criteria']['criteria_code']} - "
-                        f"{item['criteria']['criteria_name']}"
-                    ),
-                    "Target": item["target_value"],
-                    "Factor": item["factor_type"],
-                    "Weight": item["weight"]
-                }
-            )
+if is_admin:
 
-        df = pd.DataFrame(rows)
+    tab1, tab2, tab3, tab4 = st.tabs([
+        "Daftar Subcriteria",
+        "Tambah",
+        "Edit",
+        "Hapus"
+    ])
 
-        st.dataframe(
-            df,
-            use_container_width=True
-        )
+else:
 
-    else:
+    tab1 = st.container()
+
+# ==================================
+# TAB DAFTAR
+# ==================================
+
+with tab1:
+
+    st.subheader(
+        "Daftar Subcriteria"
+    )
+
+    if len(subcriteria_data) == 0:
 
         st.info(
             "Belum ada data subcriteria"
         )
 
-except Exception as e:
+    else:
 
-    st.error(e)
+        rows = []
+
+        for item in subcriteria_data:
+
+            rows.append({
+
+                "Kode":
+                item["subcriteria_code"],
+
+                "Nama":
+                item["subcriteria_name"],
+
+                "Criteria":
+                f"{item['criteria']['criteria_code']} - "
+                f"{item['criteria']['criteria_name']}",
+
+                "Target":
+                item["target_value"],
+
+                "Factor":
+                item["factor_type"]
+
+            })
+
+        st.dataframe(
+            pd.DataFrame(rows),
+            use_container_width=True
+        )
+
+# ==================================
+# ADMIN ONLY
+# ==================================
+
+if is_admin:
+
+    criteria_options = {
+
+        f"{c['criteria_code']} - {c['criteria_name']}":
+        c["id"]
+
+        for c in criteria_data
+
+    }
+
+    # ==================================
+    # TAB TAMBAH
+    # ==================================
+
+    with tab2:
+
+        st.subheader(
+            "Tambah Subcriteria"
+        )
+
+        with st.form(
+            "add_subcriteria"
+        ):
+
+            selected_criteria = st.selectbox(
+                "Criteria",
+                list(
+                    criteria_options.keys()
+                )
+            )
+
+            subcriteria_code = st.text_input(
+                "Kode Subcriteria",
+                placeholder="Kode"
+            )
+
+            subcriteria_name = st.text_input(
+                "Nama Subcriteria",
+                placeholder="Subcriteria"
+            )
+
+            target_value = st.number_input(
+                "Target Value",
+                min_value=1.0,
+                max_value=5.0,
+                value=3.0,
+                step=1.0
+            )
+
+            factor_type = st.selectbox(
+                "Factor Type",
+                [
+                    "core",
+                    "secondary"
+                ]
+            )
+
+            submit = st.form_submit_button(
+                "Simpan"
+            )
+
+        if submit:
+
+            try:
+
+                supabase.table(
+                    "subcriteria"
+                ).insert({
+
+                    "subcriteria_code":
+                    subcriteria_code,
+
+                    "criteria_id":
+                    criteria_options[
+                        selected_criteria
+                    ],
+
+                    "subcriteria_name":
+                    subcriteria_name,
+
+                    "target_value":
+                    target_value,
+
+                    "factor_type":
+                    factor_type,
+
+                    "session_id":
+                    session_id
+
+                }).execute()
+
+                st.success(
+                    "Subcriteria berhasil ditambahkan"
+                )
+
+                st.rerun()
+
+            except Exception as e:
+
+                st.error(e)
+
+    # ==================================
+    # TAB EDIT
+    # ==================================
+
+    with tab3:
+
+        st.subheader(
+            "Edit Subcriteria"
+        )
+
+        if len(subcriteria_data) == 0:
+
+            st.info(
+                "Belum ada data"
+            )
+
+        else:
+
+            selected = st.selectbox(
+                "Pilih Subcriteria",
+                subcriteria_data,
+                format_func=lambda x:
+                f"{x['subcriteria_code']} - "
+                f"{x['subcriteria_name']}"
+            )
+
+            current_criteria = None
+
+            for key, value in criteria_options.items():
+
+                if value == selected["criteria_id"]:
+
+                    current_criteria = key
+
+                    break
+
+            with st.form(
+                "edit_subcriteria"
+            ):
+
+                edit_criteria = st.selectbox(
+                    "Criteria",
+                    list(
+                        criteria_options.keys()
+                    ),
+                    index=list(
+                        criteria_options.keys()
+                    ).index(
+                        current_criteria
+                    )
+                )
+
+                edit_code = st.text_input(
+                    "Kode Subcriteria",
+                    value=selected[
+                        "subcriteria_code"
+                    ]
+                )
+
+                edit_name = st.text_input(
+                    "Nama Subcriteria",
+                    value=selected[
+                        "subcriteria_name"
+                    ]
+                )
+
+                edit_target = st.number_input(
+                    "Target Value",
+                    min_value=1.0,
+                    max_value=5.0,
+                    value=float(
+                        selected[
+                            "target_value"
+                        ]
+                    ),
+                    step=1.0
+                )
+
+                edit_factor = st.selectbox(
+                    "Factor Type",
+                    [
+                        "core",
+                        "secondary"
+                    ],
+                    index=0
+                    if selected[
+                        "factor_type"
+                    ] == "core"
+                    else 1
+                )
+
+                update_btn = (
+                    st.form_submit_button(
+                        "Update"
+                    )
+                )
+
+            if update_btn:
+
+                try:
+
+                    supabase.table(
+                        "subcriteria"
+                    ).update({
+
+                        "criteria_id":
+                        criteria_options[
+                            edit_criteria
+                        ],
+
+                        "subcriteria_code":
+                        edit_code,
+
+                        "subcriteria_name":
+                        edit_name,
+
+                        "target_value":
+                        edit_target,
+
+                        "factor_type":
+                        edit_factor
+
+                    }).eq(
+                        "id",
+                        selected["id"]
+                    ).execute()
+
+                    st.success(
+                        "Subcriteria berhasil diupdate"
+                    )
+
+                    st.rerun()
+
+                except Exception as e:
+
+                    st.error(e)
+
+    # ==================================
+    # TAB HAPUS
+    # ==================================
+
+    with tab4:
+
+        st.subheader(
+            "Hapus Subcriteria"
+        )
+
+        if len(subcriteria_data) == 0:
+
+            st.info(
+                "Belum ada data"
+            )
+
+        else:
+
+            selected_delete = st.selectbox(
+
+                "Pilih Subcriteria",
+
+                subcriteria_data,
+
+                format_func=lambda x:
+                f"{x['subcriteria_code']} - "
+                f"{x['subcriteria_name']}",
+
+                key="delete_subcriteria"
+
+            )
+
+            st.warning(
+                "Data yang dihapus tidak dapat dikembalikan."
+            )
+
+            if st.button(
+                "Hapus Subcriteria"
+            ):
+
+                try:
+
+                    supabase.table(
+                        "subcriteria"
+                    ).delete().eq(
+                        "id",
+                        selected_delete["id"]
+                    ).execute()
+
+                    st.success(
+                        "Subcriteria berhasil dihapus"
+                    )
+
+                    st.rerun()
+
+                except Exception as e:
+
+                    st.error(e)

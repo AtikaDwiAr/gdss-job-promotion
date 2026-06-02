@@ -3,171 +3,135 @@ import streamlit as st
 from database.supabase_client import supabase
 from methods.auth import require_admin
 from methods.session_status import get_dm_evaluation_status
+from methods.navigation import render_navigation
 
 require_admin()
 
+render_navigation()
+
 st.title("Session Management")
+
+tab1, tab2 = st.tabs(
+    [
+        "Daftar Session",
+        "Input Session"
+    ]
+)
 
 # =====================================
 # FORM TAMBAH SESSION
 # =====================================
 
-st.subheader("Tambah Session")
+with tab2:
 
-with st.form("add_session_form"):
+    st.subheader("Tambah Session")
 
-    session_code = st.text_input(
-        "Session Code",
-        placeholder="GS001"
-    )
+    with st.form("add_session_form"):
 
-    session_name = st.text_input(
-        "Session Name",
-        placeholder="Seleksi Karyawan 2026"
-    )
-
-    description = st.text_area(
-        "Description"
-    )
-
-    submit = st.form_submit_button(
-        "Simpan Session"
-    )
-
-if submit:
-
-    if not session_code or not session_name:
-
-        st.error(
-            "Session Code dan Session Name wajib diisi"
+        session_code = st.text_input(
+            "Session Code",
+            placeholder="GS001"
         )
 
-    else:
+        session_name = st.text_input(
+            "Session Name",
+            placeholder="Promosi Jabatan 2026"
+        )
 
-        try:
+        description = st.text_area(
+            "Description"
+        )
 
-            (
-                supabase
-                .table("gdss_sessions")
-                .insert(
-                    {
-                        "session_code": session_code,
-                        "session_name": session_name,
-                        "description": description,
-                        "status": "draft"
-                    }
+        submit = st.form_submit_button(
+            "Simpan Session"
+        )
+
+    if submit:
+
+        if not session_code or not session_name:
+
+            st.error(
+                "Session Code dan Session Name wajib diisi"
+            )
+
+        else:
+
+            try:
+
+                (
+                    supabase
+                    .table("gdss_sessions")
+                    .insert(
+                        {
+                            "session_code": session_code,
+                            "session_name": session_name,
+                            "description": description,
+                            "status": "draft"
+                        }
+                    )
+                    .execute()
                 )
-                .execute()
-            )
 
-            st.success(
-                "Session berhasil ditambahkan"
-            )
+                st.success(
+                    "Session berhasil ditambahkan"
+                )
 
-            st.rerun()
+                st.rerun()
 
-        except Exception as e:
+            except Exception as e:
 
-            st.error(str(e))
+                st.error(str(e))
 
 # =====================================
 # DAFTAR SESSION
 # =====================================
 
-st.divider()
+with tab1:
 
-st.subheader("Daftar Session")
+    st.subheader("Daftar Session")
 
-try:
+    try:
 
-    sessions = (
-        supabase
-        .table("gdss_sessions")
-        .select("*")
-        .order("id")
-        .execute()
-    )
+        sessions = (
+            supabase
+            .table("gdss_sessions")
+            .select("*")
+            .order("id")
+            .execute()
+        )
 
-    session_data = sessions.data
+        session_data = sessions.data
 
-except Exception as e:
+    except Exception as e:
 
-    st.error(str(e))
-    st.stop()
+        st.error(str(e))
+        st.stop()
 
-if len(session_data) == 0:
+    if len(session_data) == 0:
 
-    st.info("Belum ada session.")
+        st.info("Belum ada session.")
 
-else:
+    else:
 
-    for session in session_data:
+        for session in session_data:
 
-        with st.expander(
-            f"{session['session_code']} - {session['session_name']}"
-        ):
-
-            st.write(
-                f"**Status:** {session['status']}"
-            )
-
-            st.write(
-                f"**Description:** {session['description']}"
-            )
-
-            # =====================================
-            # STATUS PENILAIAN DM
-            # =====================================
-
-            st.subheader("Status Penilaian DM")
-
-            try:
-
-                statuses = get_dm_evaluation_status(
-                    session["id"]
-                )
-
-                if len(statuses) == 0:
-
-                    st.info(
-                        "Belum ada decision maker atau penilaian."
-                    )
-
-                else:
-
-                    for item in statuses:
-
-                        status_text = (
-                            "Selesai"
-                            if item["completed"]
-                            else "Belum Selesai"
-                        )
-
-                        st.write(
-                            f"DM ID {item['user_id']} : "
-                            f"{item['total_input']}/"
-                            f"{item['total_required']} "
-                            f"({status_text})"
-                        )
-
-            except Exception as e:
-
-                st.error(
-                    f"Gagal mengambil status penilaian: {str(e)}"
-                )
-
-            col1, col2 = st.columns(2)
-
-            # =====================================
-            # AUTO COMPLETED SESSION
-            # =====================================
-
-            st.divider()
-
-            if st.button(
-                "Finalisasi Penilaian",
-                key=f"finalize_eval_{session['id']}"
+            with st.expander(
+                f"{session['session_code']} - {session['session_name']}"
             ):
+
+                st.write(
+                    f"**Status:** {session['status']}"
+                )
+
+                st.write(
+                    f"**Description:** {session['description']}"
+                )
+
+                # =====================================
+                # STATUS PENILAIAN DM
+                # =====================================
+
+                st.subheader("Status Penilaian DM")
 
                 try:
 
@@ -175,170 +139,222 @@ else:
                         session["id"]
                     )
 
-                    all_completed = all(
-                        s["completed"]
-                        for s in statuses
-                    )
+                    if len(statuses) == 0:
 
-                    if not all_completed:
-
-                        st.error(
-                            "Masih ada DM yang belum selesai menilai"
+                        st.info(
+                            "Belum ada decision maker atau penilaian."
                         )
 
                     else:
 
-                        (
-                            supabase
-                            .table("gdss_sessions")
-                            .update(
-                                {
-                                    "status": "completed"
-                                }
-                            )
-                            .eq(
-                                "id",
-                                session["id"]
-                            )
-                            .execute()
-                        )
+                        for item in statuses:
 
-                        st.success(
-                            "Session berhasil diselesaikan"
-                        )
+                            status_text = (
+                                "Selesai"
+                                if item["completed"]
+                                else "Belum Selesai"
+                            )
 
-                        st.rerun()
+                            st.write(
+                                f"{item['user_name']} : "
+                                f"{item['total_input']}/"
+                                f"{item['total_required']} "
+                                f"({status_text})"
+                            )
 
                 except Exception as e:
 
-                    st.error(str(e))
+                    st.error(
+                        f"Gagal mengambil status penilaian: {str(e)}"
+                    )
 
-            # =====================================
-            # UPDATE STATUS
-            # =====================================
+                col1, col2 = st.columns(2)
 
-            with col1:
+                # =====================================
+                # FINALISASI HASIL
+                # =====================================
 
-                status_options = [
-                    "draft",
-                    "active",
-                    "completed",
-                    "finalized"
-                ]
+                st.divider()
 
-                new_status = st.selectbox(
-                    "Status",
-                    options=status_options,
-                    index=status_options.index(
-                        session["status"]
-                    ),
-                    key=f"status_{session['id']}"
-                )
+                if session["status"] == "completed":
 
-                if st.button(
-                    "Update Status",
-                    key=f"update_{session['id']}"
-                ):
+                    if st.button(
+                        "Finalisasi Hasil",
+                        key=f"finalize_{session['id']}"
+                    ):
 
-                    try:
-
-                        (
-                            supabase
-                            .table("gdss_sessions")
-                            .update(
-                                {
-                                    "status": new_status
-                                }
-                            )
-                            .eq(
-                                "id",
-                                session["id"]
-                            )
-                            .execute()
-                        )
-
-                        st.success(
-                            "Status berhasil diperbarui"
-                        )
-
-                        st.rerun()
-
-                    except Exception as e:
-
-                        st.error(str(e))
-
-            # =====================================
-            # HAPUS SESSION
-            # =====================================
-
-            with col2:
-
-                if st.button(
-                    "Hapus Session",
-                    key=f"delete_{session['id']}"
-                ):
-
-                    try:
-
-                        session_id = session["id"]
-
-                        related_tables = [
-                            "criteria",
-                            "subcriteria",
-                            "alternatives",
-                            "evaluations",
-                            "profile_matching_detail",
-                            "profile_matching_results",
-                            "profile_matching_summary",
-                            "borda_results"
-                        ]
-
-                        has_relation = False
-
-                        for table_name in related_tables:
-
-                            result = (
-                                supabase
-                                .table(table_name)
-                                .select("id")
-                                .eq(
-                                    "session_id",
-                                    session_id
-                                )
-                                .limit(1)
-                                .execute()
-                            )
-
-                            if len(result.data) > 0:
-
-                                has_relation = True
-                                break
-
-                        if has_relation:
-
-                            st.error(
-                                "Session tidak dapat dihapus karena masih memiliki data terkait."
-                            )
-
-                        else:
+                        try:
 
                             (
                                 supabase
                                 .table("gdss_sessions")
-                                .delete()
+                                .update(
+                                    {
+                                        "status": "finalized"
+                                    }
+                                )
                                 .eq(
                                     "id",
-                                    session_id
+                                    session["id"]
                                 )
                                 .execute()
                             )
 
                             st.success(
-                                "Session berhasil dihapus."
+                                "Session berhasil difinalisasi"
                             )
 
                             st.rerun()
 
-                    except Exception as e:
+                        except Exception as e:
 
-                        st.error(str(e))
+                            st.error(str(e))
+
+                elif session["status"] == "finalized":
+
+                    st.success(
+                        "Session sudah Finalized"
+                    )
+
+                # =====================================
+                # UPDATE STATUS
+                # =====================================
+
+                with col1:
+
+                    if session["status"] == "finalized":
+
+                        st.success(
+                            "Status sudah Finalized dan tidak dapat diubah lagi."
+                        )
+
+                    else:
+
+                        status_options = [
+                            "draft",
+                            "active",
+                            "completed"
+                        ]
+
+                        current_status = session["status"]
+
+                        if current_status not in status_options:
+
+                            current_status = "draft"
+
+                        new_status = st.selectbox(
+                            "Status",
+                            options=status_options,
+                            index=status_options.index(
+                                current_status
+                            ),
+                            key=f"status_{session['id']}"
+                        )
+
+                        if st.button(
+                            "Update Status",
+                            key=f"update_{session['id']}"
+                        ):
+
+                            try:
+
+                                (
+                                    supabase
+                                    .table("gdss_sessions")
+                                    .update(
+                                        {
+                                            "status": new_status
+                                        }
+                                    )
+                                    .eq(
+                                        "id",
+                                        session["id"]
+                                    )
+                                    .execute()
+                                )
+
+                                st.success(
+                                    "Status berhasil diperbarui"
+                                )
+
+                                st.rerun()
+
+                            except Exception as e:
+
+                                st.error(str(e))
+
+                # =====================================
+                # HAPUS SESSION
+                # =====================================
+
+                with col2:
+
+                    if st.button(
+                        "Hapus Session",
+                        key=f"delete_{session['id']}"
+                    ):
+
+                        try:
+
+                            session_id = session["id"]
+
+                            related_tables = [
+                                "criteria",
+                                "subcriteria",
+                                "alternatives",
+                                "evaluations",
+                                "profile_matching_detail",
+                                "profile_matching_results",
+                                "profile_matching_summary",
+                                "borda_results"
+                            ]
+
+                            has_relation = False
+
+                            for table_name in related_tables:
+
+                                result = (
+                                    supabase
+                                    .table(table_name)
+                                    .select("id")
+                                    .eq(
+                                        "session_id",
+                                        session_id
+                                    )
+                                    .limit(1)
+                                    .execute()
+                                )
+
+                                if len(result.data) > 0:
+
+                                    has_relation = True
+                                    break
+
+                            if has_relation:
+
+                                st.error(
+                                    "Session tidak dapat dihapus karena masih memiliki data terkait."
+                                )
+
+                            else:
+
+                                (
+                                    supabase
+                                    .table("gdss_sessions")
+                                    .delete()
+                                    .eq(
+                                        "id",
+                                        session_id
+                                    )
+                                    .execute()
+                                )
+
+                                st.success(
+                                    "Session berhasil dihapus."
+                                )
+
+                                st.rerun()
+
+                        except Exception as e:
+
+                            st.error(str(e))

@@ -4,10 +4,10 @@ import pandas as pd
 from database.supabase_client import supabase
 from methods.auth import (
     require_login,
-    is_admin_role,
     is_dm_role
 )
 from methods.ui import apply_base_theme
+from methods.navigation import render_navigation
 
 st.set_page_config(
     layout="wide",
@@ -16,22 +16,15 @@ st.set_page_config(
 
 apply_base_theme()
 require_login()
+render_navigation()
 
-is_admin = is_admin_role(
+# =====================================
+# ROLE CHECK
+# =====================================
+
+if not is_dm_role(
     st.session_state.get("role_name")
-)
-
-is_dm = is_dm_role(
-    st.session_state.get("role_name")
-)
-
-st.title("Evaluation")
-
-# ==================================
-# HANYA DM YANG BOLEH MENILAI
-# ==================================
-
-if not is_dm:
+):
 
     st.info(
         "Halaman ini hanya digunakan oleh Decision Maker."
@@ -41,13 +34,15 @@ if not is_dm:
 
 user_id = st.session_state["user_id"]
 
-st.write(
+st.title("Evaluation")
+
+st.info(
     f"Decision Maker : {st.session_state['user_name']}"
 )
 
-# ==================================
-# SESSION ACTIVE
-# ==================================
+# =====================================
+# SESSION
+# =====================================
 
 try:
 
@@ -62,13 +57,13 @@ try:
 
 except Exception as e:
 
-    st.error(f"Gagal mengambil session : {e}")
+    st.error(e)
     st.stop()
 
 if len(sessions) == 0:
 
     st.warning(
-        "Belum ada session yang aktif."
+        "Penilaian hanya dapat dilakukan pada session ACTIVE."
     )
 
     st.stop()
@@ -77,306 +72,386 @@ selected_session = st.selectbox(
     "Session",
     sessions,
     format_func=lambda x:
-        f"{x['session_code']} - {x['session_name']}"
+    f"{x['session_code']} - {x['session_name']}"
 )
 
 session_id = selected_session["id"]
 
-if selected_session["status"] in [
-    "completed",
-    "finalized"
-]:
+# =====================================
+# ALTERNATIVES
+# =====================================
 
-    st.warning(
-        "Session sudah ditutup."
-    )
-
-    st.stop()
-
-# ==================================
-# LOAD ALTERNATIVES
-# ==================================
-
-try:
-
-    alternatives = (
-        supabase
-        .table("alternatives")
-        .select("*")
-        .eq("session_id", session_id)
-        .order("alternative_code")
-        .execute()
-    ).data
-
-except Exception as e:
-
-    st.error(f"Gagal mengambil alternatives : {e}")
-    st.stop()
+alternatives = (
+    supabase
+    .table("alternatives")
+    .select("*")
+    .eq("session_id", session_id)
+    .order("alternative_code")
+    .execute()
+).data
 
 if len(alternatives) == 0:
 
     st.warning(
-        "Belum ada alternative pada session ini."
+        "Belum ada alternative"
     )
 
     st.stop()
 
-# ==================================
-# LOAD SUBCRITERIA
-# ==================================
+# =====================================
+# CRITERIA
+# =====================================
 
-try:
-
-    subcriteria = (
-        supabase
-        .table("subcriteria")
-        .select("""
-            *,
-            criteria(
-                criteria_code,
-                criteria_name
-            )
-        """)
-        .eq("session_id", session_id)
-        .order("subcriteria_code")
-        .execute()
-    ).data
-
-except Exception as e:
-
-    st.error(f"Gagal mengambil subcriteria : {e}")
-    st.stop()
-
-if len(subcriteria) == 0:
-
-    st.warning(
-        "Belum ada subcriteria pada session ini."
-    )
-
-    st.stop()
-
-# ==================================
-# PILIH ALTERNATIVE
-# ==================================
-
-alternative_options = {
-    f"{alt['alternative_code']} - {alt['alternative_name']}":
-    alt["id"]
-    for alt in alternatives
-}
-
-selected_alternative = st.selectbox(
-    "Alternative",
-    list(alternative_options.keys())
-)
-
-alternative_id = alternative_options[
-    selected_alternative
-]
-
-# ==================================
-# LOAD EXISTING EVALUATION
-# ==================================
-
-existing = (
+criteria_data = (
     supabase
-    .table("evaluations")
+    .table("criteria")
     .select("*")
-    .eq("user_id", user_id)
-    .eq("alternative_id", alternative_id)
     .eq("session_id", session_id)
+    .order("criteria_code")
     .execute()
 ).data
 
-existing_scores = {
-    row["subcriteria_id"]: float(row["score"])
-    for row in existing
-}
+if len(criteria_data) == 0:
 
-# ==================================
-# FORM PENILAIAN
-# ==================================
-
-st.subheader("Input Nilai")
-
-scores = {}
-
-with st.form("evaluation_form"):
-
-    current_criteria = None
-
-    for sub in subcriteria:
-
-        criteria_name = (
-            sub["criteria"]["criteria_code"]
-            + " - "
-            + sub["criteria"]["criteria_name"]
-        )
-
-        if current_criteria != criteria_name:
-
-            st.markdown(
-                f"### {criteria_name}"
-            )
-
-            current_criteria = criteria_name
-
-        score = st.number_input(
-            label=(
-                f"{sub['subcriteria_code']} - "
-                f"{sub['subcriteria_name']}"
-            ),
-            min_value=1.0,
-            max_value=5.0,
-            value=float(
-                existing_scores.get(
-                    sub["id"],
-                    1
-                )
-            ),
-            step=1.0,
-            key=sub["id"]
-        )
-
-        scores[sub["id"]] = score
-
-    submit = st.form_submit_button(
-        "Simpan Penilaian"
+    st.warning(
+        "Belum ada criteria"
     )
 
-if submit:
+    st.stop()
+
+# =====================================
+# SUBCRITERIA
+# =====================================
+
+subcriteria_data = (
+    supabase
+    .table("subcriteria")
+    .select("""
+        *,
+        criteria(
+            criteria_code,
+            criteria_name
+        )
+    """)
+    .eq("session_id", session_id)
+    .order("subcriteria_code")
+    .execute()
+).data
+
+if len(subcriteria_data) == 0:
+
+    st.warning(
+        "Belum ada subcriteria"
+    )
+
+    st.stop()
+
+# =====================================
+# TABS
+# =====================================
+
+tab1, tab2 = st.tabs([
+    "Data Evaluasi Saya",
+    "Input Penilaian"
+])
+
+# =====================================
+# TAB DATA
+# =====================================
+
+with tab1:
+
+    st.subheader(
+        "Data Evaluasi Saya"
+    )
 
     try:
 
-        for sub_id, score in scores.items():
+        evaluations = (
 
-            existing_record = (
-                supabase
-                .table("evaluations")
-                .select("id")
-                .eq("user_id", user_id)
-                .eq("alternative_id", alternative_id)
-                .eq("subcriteria_id", sub_id)
-                .eq("session_id", session_id)
-                .execute()
+            supabase
+            .table("evaluations")
+            .select("""
+                *,
+                alternatives(
+                    alternative_code,
+                    alternative_name
+                ),
+                subcriteria(
+                    subcriteria_code,
+                    subcriteria_name
+                )
+            """)
+            .eq(
+                "user_id",
+                user_id
+            )
+            .eq(
+                "session_id",
+                session_id
+            )
+            .execute()
+
+        ).data
+
+        if len(evaluations) > 0:
+
+            rows = []
+
+            for item in evaluations:
+
+                rows.append({
+
+                    "Alternative":
+
+                    f"{item['alternatives']['alternative_code']} - "
+                    f"{item['alternatives']['alternative_name']}",
+
+                    "Subcriteria":
+
+                    f"{item['subcriteria']['subcriteria_code']} - "
+                    f"{item['subcriteria']['subcriteria_name']}",
+
+                    "Score":
+                    item["score"]
+
+                })
+
+            st.dataframe(
+                pd.DataFrame(rows),
+                use_container_width=True
             )
 
-            if len(existing_record.data) > 0:
+        else:
 
-                evaluation_id = (
-                    existing_record
-                    .data[0]["id"]
-                )
-
-                (
-                    supabase
-                    .table("evaluations")
-                    .update(
-                        {
-                            "score": score
-                        }
-                    )
-                    .eq(
-                        "id",
-                        evaluation_id
-                    )
-                    .execute()
-                )
-
-            else:
-
-                (
-                    supabase
-                    .table("evaluations")
-                    .insert(
-                        {
-                            "user_id": user_id,
-                            "alternative_id": alternative_id,
-                            "subcriteria_id": sub_id,
-                            "score": score,
-                            "session_id": session_id
-                        }
-                    )
-                    .execute()
-                )
-
-        st.success(
-            "Penilaian berhasil disimpan"
-        )
-
-        st.rerun()
+            st.info(
+                "Belum ada data evaluasi"
+            )
 
     except Exception as e:
 
-        st.error(
-            f"Gagal menyimpan penilaian : {e}"
+        st.error(e)
+
+# =====================================
+# TAB INPUT / EDIT
+# =====================================
+
+with tab2:
+
+    st.subheader(
+        "Input Penilaian"
+    )
+
+    alternative_options = {
+
+        f"{a['alternative_code']} - "
+        f"{a['alternative_name']}":
+
+        a["id"]
+
+        for a in alternatives
+
+    }
+
+    selected_alternative = st.selectbox(
+        "Alternative",
+        list(
+            alternative_options.keys()
         )
+    )
 
-# ==================================
-# DATA EVALUASI SAYA
-# ==================================
+    alternative_id = (
+        alternative_options[
+            selected_alternative
+        ]
+    )
 
-st.divider()
+    criteria_options = {
 
-st.subheader(
-    "Data Evaluasi Saya"
-)
+        f"{c['criteria_code']} - "
+        f"{c['criteria_name']}":
 
-try:
+        c["id"]
 
-    evaluations = (
+        for c in criteria_data
+
+    }
+
+    selected_criteria = st.selectbox(
+        "Criteria",
+        list(
+            criteria_options.keys()
+        )
+    )
+
+    criteria_id = (
+        criteria_options[
+            selected_criteria
+        ]
+    )
+
+    selected_subcriteria = [
+
+        s
+
+        for s in subcriteria_data
+
+        if s["criteria_id"]
+        == criteria_id
+
+    ]
+
+    existing = (
+
         supabase
         .table("evaluations")
-        .select("""
-            score,
-            alternatives(
-                alternative_code,
-                alternative_name
-            ),
-            subcriteria(
-                subcriteria_code,
-                subcriteria_name
-            )
-        """)
-        .eq("user_id", user_id)
-        .eq("session_id", session_id)
+        .select("*")
+        .eq(
+            "user_id",
+            user_id
+        )
+        .eq(
+            "alternative_id",
+            alternative_id
+        )
+        .eq(
+            "session_id",
+            session_id
+        )
         .execute()
+
     ).data
 
-    if len(evaluations) > 0:
+    existing_scores = {
 
-        rows = []
+        row["subcriteria_id"]:
+        float(
+            row["score"]
+        )
 
-        for item in evaluations:
+        for row in existing
 
-            rows.append(
-                {
-                    "Alternative":
-                        f"{item['alternatives']['alternative_code']} - "
-                        f"{item['alternatives']['alternative_name']}",
+    }
 
-                    "Subcriteria":
-                        f"{item['subcriteria']['subcriteria_code']} - "
-                        f"{item['subcriteria']['subcriteria_name']}",
+    scores = {}
 
-                    "Score":
-                        item["score"]
-                }
+    with st.form(
+        "evaluation_form"
+    ):
+
+        for sub in selected_subcriteria:
+
+            scores[sub["id"]] = st.number_input(
+
+                label=
+                f"{sub['subcriteria_code']} - "
+                f"{sub['subcriteria_name']}",
+
+                min_value=1.0,
+                max_value=5.0,
+
+                value=float(
+                    existing_scores.get(
+                        sub["id"],
+                        1
+                    )
+                ),
+
+                step=1.0,
+
+                key=f"sub_{sub['id']}"
+
             )
 
-        df = pd.DataFrame(rows)
-
-        st.dataframe(
-            df,
-            use_container_width=True
+        submit = st.form_submit_button(
+            "Simpan"
         )
 
-    else:
+    if submit:
 
-        st.info(
-            "Belum ada data evaluasi."
-        )
+        try:
 
-except Exception as e:
+            for sub_id, score in scores.items():
 
-    st.error(e)
+                existing_record = (
+
+                    supabase
+                    .table("evaluations")
+                    .select("id")
+                    .eq(
+                        "user_id",
+                        user_id
+                    )
+                    .eq(
+                        "alternative_id",
+                        alternative_id
+                    )
+                    .eq(
+                        "subcriteria_id",
+                        sub_id
+                    )
+                    .eq(
+                        "session_id",
+                        session_id
+                    )
+                    .execute()
+
+                )
+
+                if len(
+                    existing_record.data
+                ) > 0:
+
+                    evaluation_id = (
+                        existing_record
+                        .data[0]["id"]
+                    )
+
+                    (
+                        supabase
+                        .table("evaluations")
+                        .update({
+                            "score": score
+                        })
+                        .eq(
+                            "id",
+                            evaluation_id
+                        )
+                        .execute()
+                    )
+
+                else:
+
+                    (
+                        supabase
+                        .table("evaluations")
+                        .insert({
+
+                            "user_id":
+                            user_id,
+
+                            "alternative_id":
+                            alternative_id,
+
+                            "subcriteria_id":
+                            sub_id,
+
+                            "score":
+                            score,
+
+                            "session_id":
+                            session_id
+
+                        })
+                        .execute()
+                    )
+
+            st.success(
+                "Penilaian berhasil disimpan"
+            )
+
+            st.rerun()
+
+        except Exception as e:
+
+            st.error(e)

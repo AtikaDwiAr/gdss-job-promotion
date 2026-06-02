@@ -8,6 +8,7 @@ from methods.auth import (
     is_admin_role
 )
 from methods.ui import apply_base_theme
+from methods.navigation import render_navigation
 
 st.set_page_config(
     layout="wide",
@@ -16,6 +17,7 @@ st.set_page_config(
 
 apply_base_theme()
 require_login()
+render_navigation()
 
 is_admin = is_admin_role(
     st.session_state.get("role_name")
@@ -66,7 +68,7 @@ session_id = selected_session["id"]
 if selected_session["status"] != "completed":
 
     st.warning(
-        "Session harus completed sebelum Borda dihitung"
+        "Borda hanya dapat dihitung pada session COMPLETED."
     )
 
     st.stop()

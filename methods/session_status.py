@@ -1,6 +1,9 @@
 from database.supabase_client import supabase
 
 
+from database.supabase_client import supabase
+
+
 def get_dm_users():
 
     users = (
@@ -8,6 +11,8 @@ def get_dm_users():
         .table("users")
         .select("""
             id,
+            name,
+            email,
             roles(role_name)
         """)
         .execute()
@@ -22,11 +27,26 @@ def get_dm_users():
         role_name = None
 
         if isinstance(role, dict):
-            role_name = role.get("role_name")
+
+            role_name = role.get(
+                "role_name"
+            )
+
+        elif isinstance(role, list):
+
+            if len(role) > 0:
+
+                role_name = role[0].get(
+                    "role_name"
+                )
 
         if role_name:
 
-            normalized = role_name.lower().strip()
+            normalized = (
+                role_name
+                .lower()
+                .strip()
+            )
 
             if normalized in [
                 "decision maker",
@@ -35,7 +55,13 @@ def get_dm_users():
                 "decision_maker"
             ]:
 
-                dm_users.append(user)
+                dm_users.append(
+                    {
+                        "id": user["id"],
+                        "name": user["name"],
+                        "email": user["email"]
+                    }
+                )
 
     return dm_users
 
@@ -88,6 +114,7 @@ def get_dm_evaluation_status(session_id):
 
         results.append({
             "user_id": dm["id"],
+            "user_name": dm["name"],
             "total_input": total_input,
             "total_required": total_required,
             "completed": is_completed

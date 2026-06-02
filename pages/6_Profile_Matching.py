@@ -9,6 +9,7 @@ from methods.auth import (
     is_dm_role
 )
 from methods.ui import apply_base_theme
+from methods.navigation import render_navigation
 
 st.set_page_config(
     layout="wide",
@@ -17,6 +18,7 @@ st.set_page_config(
 
 apply_base_theme()
 require_login()
+render_navigation()
 
 is_admin = is_admin_role(
     st.session_state.get("role_name")
@@ -71,6 +73,7 @@ if is_admin:
         supabase
         .table("users")
         .select("*")
+        .eq("role_id", 2)
         .execute()
     ).data
 
@@ -101,6 +104,18 @@ elif is_dm:
     )
 
 else:
+
+    st.stop()
+
+# =====================================
+# VALIDASI SESSION
+# =====================================
+
+if selected_session["status"] != "completed":
+
+    st.warning(
+        "Profile Matching hanya dapat dihitung pada session COMPLETED."
+    )
 
     st.stop()
 

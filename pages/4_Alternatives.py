@@ -2,8 +2,16 @@ import streamlit as st
 import pandas as pd
 
 from database.supabase_client import supabase
-from methods.auth import require_login, is_admin_role
+from methods.auth import (
+    require_login,
+    is_admin_role
+)
 from methods.ui import apply_base_theme
+from methods.navigation import render_navigation
+
+# ==================================
+# PAGE CONFIG
+# ==================================
 
 st.set_page_config(
     layout="wide",
@@ -13,6 +21,8 @@ st.set_page_config(
 apply_base_theme()
 require_login()
 
+render_navigation()
+
 is_admin = is_admin_role(
     st.session_state.get("role_name")
 )
@@ -20,7 +30,7 @@ is_admin = is_admin_role(
 st.title("Alternatives")
 
 # ==================================
-# PILIH SESSION
+# SESSION
 # ==================================
 
 try:
@@ -37,143 +47,345 @@ try:
 
 except Exception as e:
 
-    st.error(f"Gagal mengambil session: {e}")
+    st.error(e)
     st.stop()
 
 if len(session_data) == 0:
 
     st.warning(
-        "Belum ada session. Silakan buat session terlebih dahulu."
+        "Belum ada session."
     )
 
     st.stop()
 
 selected_session = st.selectbox(
     "Pilih Session",
-    options=session_data,
+    session_data,
     format_func=lambda x:
-        f"{x['session_code']} - {x['session_name']}"
+    f"{x['session_code']} - {x['session_name']}"
 )
 
 session_id = selected_session["id"]
 
 # ==================================
-# FORM TAMBAH ALTERNATIVE
+# LOAD ALTERNATIVES
 # ==================================
-
-if is_admin:
-
-    st.subheader("Tambah Alternative")
-
-    with st.form("alternative_form"):
-
-        alternative_code = st.text_input(
-            "Kode Alternative",
-            placeholder="A001"
-        )
-
-        alternative_name = st.text_input(
-            "Nama Alternative",
-            placeholder="Andi"
-        )
-
-        description = st.text_area(
-            "Deskripsi",
-            placeholder="Kandidat untuk promosi jabatan"
-        )
-
-        submit = st.form_submit_button(
-            "Simpan"
-        )
-
-    if submit:
-
-        if alternative_code == "" or alternative_name == "":
-
-            st.warning(
-                "Kode dan Nama wajib diisi"
-            )
-
-        else:
-
-            try:
-
-                supabase.table(
-                    "alternatives"
-                ).insert(
-                    {
-                        "alternative_code": alternative_code,
-                        "alternative_name": alternative_name,
-                        "description": description,
-                        "session_id": session_id
-                    }
-                ).execute()
-
-                st.success(
-                    "Alternative berhasil disimpan"
-                )
-
-                st.rerun()
-
-            except Exception as e:
-
-                st.error(f"Error : {e}")
-
-else:
-
-    st.info(
-        "ℹ️ Hanya Admin yang dapat menambah Alternative"
-    )
-
-# ==================================
-# TAMPILKAN DATA
-# ==================================
-
-st.divider()
-
-st.subheader("Daftar Alternatives")
 
 try:
 
-    response = (
+    alternatives_data = (
+
         supabase
         .table("alternatives")
         .select("*")
-        .eq("session_id", session_id)
-        .order("alternative_code")
+        .eq(
+            "session_id",
+            session_id
+        )
+        .order(
+            "alternative_code"
+        )
         .execute()
-    )
 
-    data = response.data
+    ).data
 
 except Exception as e:
 
     st.error(e)
     st.stop()
 
-if len(data) > 0:
+# ==================================
+# TABS
+# ==================================
 
-    rows = []
+if is_admin:
 
-    for item in data:
-
-        rows.append(
-            {
-                "Kode": item["alternative_code"],
-                "Nama": item["alternative_name"],
-                "Deskripsi": item["description"]
-            }
-        )
-
-    df = pd.DataFrame(rows)
-
-    st.dataframe(
-        df,
-        use_container_width=True
-    )
+    tab1, tab2, tab3, tab4 = st.tabs([
+        "Daftar Alternative",
+        "Tambah",
+        "Edit",
+        "Hapus"
+    ])
 
 else:
 
-    st.info(
-        "Belum ada data alternative"
+    tab1 = st.container()
+
+# ==================================
+# TAB DAFTAR
+# ==================================
+
+with tab1:
+
+    st.subheader(
+        "Daftar Alternative"
     )
+
+    if len(alternatives_data) == 0:
+
+        st.info(
+            "Belum ada data alternative"
+        )
+
+    else:
+
+        rows = []
+
+        for item in alternatives_data:
+
+            rows.append({
+
+                "Kode":
+                item["alternative_code"],
+
+                "Nama":
+                item["alternative_name"],
+
+                "Deskripsi":
+                item["description"]
+
+            })
+
+        st.dataframe(
+            pd.DataFrame(rows),
+            use_container_width=True
+        )
+
+# ==================================
+# ADMIN ONLY
+# ==================================
+
+if is_admin:
+
+    # ==================================
+    # TAB TAMBAH
+    # ==================================
+
+    with tab2:
+
+        st.subheader(
+            "Tambah Alternative"
+        )
+
+        with st.form(
+            "add_alternative"
+        ):
+
+            alternative_code = st.text_input(
+                "Kode Alternative",
+                placeholder="Kode"
+            )
+
+            alternative_name = st.text_input(
+                "Nama Alternative",
+                placeholder="Nama"
+            )
+
+            description = st.text_area(
+                "Deskripsi",
+                placeholder="Kandidat promosi jabatan"
+            )
+
+            submit = st.form_submit_button(
+                "Simpan"
+            )
+
+        if submit:
+
+            if (
+                alternative_code == ""
+                or
+                alternative_name == ""
+            ):
+
+                st.warning(
+                    "Kode dan Nama wajib diisi"
+                )
+
+            else:
+
+                try:
+
+                    supabase.table(
+                        "alternatives"
+                    ).insert({
+
+                        "alternative_code":
+                        alternative_code,
+
+                        "alternative_name":
+                        alternative_name,
+
+                        "description":
+                        description,
+
+                        "session_id":
+                        session_id
+
+                    }).execute()
+
+                    st.success(
+                        "Alternative berhasil ditambahkan"
+                    )
+
+                    st.rerun()
+
+                except Exception as e:
+
+                    st.error(e)
+
+    # ==================================
+    # TAB EDIT
+    # ==================================
+
+    with tab3:
+
+        st.subheader(
+            "Edit Alternative"
+        )
+
+        if len(alternatives_data) == 0:
+
+            st.info(
+                "Belum ada data"
+            )
+
+        else:
+
+            selected = st.selectbox(
+
+                "Pilih Alternative",
+
+                alternatives_data,
+
+                format_func=lambda x:
+                f"{x['alternative_code']} - "
+                f"{x['alternative_name']}"
+
+            )
+
+            with st.form(
+                "edit_alternative"
+            ):
+
+                edit_code = st.text_input(
+                    "Kode Alternative",
+                    value=selected[
+                        "alternative_code"
+                    ]
+                )
+
+                edit_name = st.text_input(
+                    "Nama Alternative",
+                    value=selected[
+                        "alternative_name"
+                    ]
+                )
+
+                edit_description = st.text_area(
+                    "Deskripsi",
+                    value=selected[
+                        "description"
+                    ]
+                    if selected[
+                        "description"
+                    ]
+                    else ""
+                )
+
+                update_btn = (
+                    st.form_submit_button(
+                        "Update"
+                    )
+                )
+
+            if update_btn:
+
+                try:
+
+                    supabase.table(
+                        "alternatives"
+                    ).update({
+
+                        "alternative_code":
+                        edit_code,
+
+                        "alternative_name":
+                        edit_name,
+
+                        "description":
+                        edit_description
+
+                    }).eq(
+                        "id",
+                        selected["id"]
+                    ).execute()
+
+                    st.success(
+                        "Alternative berhasil diupdate"
+                    )
+
+                    st.rerun()
+
+                except Exception as e:
+
+                    st.error(e)
+
+    # ==================================
+    # TAB HAPUS
+    # ==================================
+
+    with tab4:
+
+        st.subheader(
+            "Hapus Alternative"
+        )
+
+        if len(alternatives_data) == 0:
+
+            st.info(
+                "Belum ada data"
+            )
+
+        else:
+
+            selected_delete = st.selectbox(
+
+                "Pilih Alternative",
+
+                alternatives_data,
+
+                format_func=lambda x:
+                f"{x['alternative_code']} - "
+                f"{x['alternative_name']}",
+
+                key="delete_alternative"
+
+            )
+
+            st.warning(
+                "Data yang dihapus tidak dapat dikembalikan."
+            )
+
+            if st.button(
+                "Hapus Alternative"
+            ):
+
+                try:
+
+                    supabase.table(
+                        "alternatives"
+                    ).delete().eq(
+                        "id",
+                        selected_delete["id"]
+                    ).execute()
+
+                    st.success(
+                        "Alternative berhasil dihapus"
+                    )
+
+                    st.rerun()
+
+                except Exception as e:
+
+                    st.error(e)
