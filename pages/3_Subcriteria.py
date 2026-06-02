@@ -59,7 +59,12 @@ selected_session = st.selectbox(
 )
 
 session_id = selected_session["id"]
+session_status = selected_session["status"]
 
+is_editable = (
+    is_admin
+    and session_status == "draft"
+)
 # ==================================
 # AMBIL CRITERIA BERDASARKAN SESSION
 # ==================================
@@ -212,86 +217,93 @@ if is_admin:
             "Tambah Subcriteria"
         )
 
-        with st.form(
-            "add_subcriteria"
-        ):
-
-            selected_criteria = st.selectbox(
-                "Criteria",
-                list(
-                    criteria_options.keys()
-                )
+        if not is_editable:
+            st.info(
+                "Subcriteria hanya dapat ditambah saat session DRAFT."
             )
 
-            subcriteria_code = st.text_input(
-                "Kode Subcriteria",
-                placeholder="Kode"
-            )
+        else:
 
-            subcriteria_name = st.text_input(
-                "Nama Subcriteria",
-                placeholder="Subcriteria"
-            )
+            with st.form(
+                "add_subcriteria"
+            ):
 
-            target_value = st.number_input(
-                "Target Value",
-                min_value=1.0,
-                max_value=5.0,
-                value=3.0,
-                step=1.0
-            )
-
-            factor_type = st.selectbox(
-                "Factor Type",
-                [
-                    "core",
-                    "secondary"
-                ]
-            )
-
-            submit = st.form_submit_button(
-                "Simpan"
-            )
-
-        if submit:
-
-            try:
-
-                supabase.table(
-                    "subcriteria"
-                ).insert({
-
-                    "subcriteria_code":
-                    subcriteria_code,
-
-                    "criteria_id":
-                    criteria_options[
-                        selected_criteria
-                    ],
-
-                    "subcriteria_name":
-                    subcriteria_name,
-
-                    "target_value":
-                    target_value,
-
-                    "factor_type":
-                    factor_type,
-
-                    "session_id":
-                    session_id
-
-                }).execute()
-
-                st.success(
-                    "Subcriteria berhasil ditambahkan"
+                selected_criteria = st.selectbox(
+                    "Criteria",
+                    list(
+                        criteria_options.keys()
+                    )
                 )
 
-                st.rerun()
+                subcriteria_code = st.text_input(
+                    "Kode Subcriteria",
+                    placeholder="Kode"
+                )
 
-            except Exception as e:
+                subcriteria_name = st.text_input(
+                    "Nama Subcriteria",
+                    placeholder="Subcriteria"
+                )
 
-                st.error(e)
+                target_value = st.number_input(
+                    "Target Value",
+                    min_value=1.0,
+                    max_value=5.0,
+                    value=3.0,
+                    step=1.0
+                )
+
+                factor_type = st.selectbox(
+                    "Factor Type",
+                    [
+                        "core",
+                        "secondary"
+                    ]
+                )
+
+                submit = st.form_submit_button(
+                    "Simpan"
+                )
+
+            if submit:
+
+                try:
+
+                    supabase.table(
+                        "subcriteria"
+                    ).insert({
+
+                        "subcriteria_code":
+                        subcriteria_code,
+
+                        "criteria_id":
+                        criteria_options[
+                            selected_criteria
+                        ],
+
+                        "subcriteria_name":
+                        subcriteria_name,
+
+                        "target_value":
+                        target_value,
+
+                        "factor_type":
+                        factor_type,
+
+                        "session_id":
+                        session_id
+
+                    }).execute()
+
+                    st.success(
+                        "Subcriteria berhasil ditambahkan"
+                    )
+
+                    st.rerun()
+
+                except Exception as e:
+
+                    st.error(e)
 
     # ==================================
     # TAB EDIT
@@ -303,132 +315,139 @@ if is_admin:
             "Edit Subcriteria"
         )
 
-        if len(subcriteria_data) == 0:
-
+        if not is_editable:
             st.info(
-                "Belum ada data"
+                "Subcriteria hanya dapat diedit saat session DRAFT."
             )
 
         else:
 
-            selected = st.selectbox(
-                "Pilih Subcriteria",
-                subcriteria_data,
-                format_func=lambda x:
-                f"{x['subcriteria_code']} - "
-                f"{x['subcriteria_name']}"
-            )
+            if len(subcriteria_data) == 0:
 
-            current_criteria = None
+                st.info(
+                    "Belum ada data"
+                )
 
-            for key, value in criteria_options.items():
+            else:
 
-                if value == selected["criteria_id"]:
+                selected = st.selectbox(
+                    "Pilih Subcriteria",
+                    subcriteria_data,
+                    format_func=lambda x:
+                    f"{x['subcriteria_code']} - "
+                    f"{x['subcriteria_name']}"
+                )
 
-                    current_criteria = key
+                current_criteria = None
 
-                    break
+                for key, value in criteria_options.items():
 
-            with st.form(
-                "edit_subcriteria"
-            ):
+                    if value == selected["criteria_id"]:
 
-                edit_criteria = st.selectbox(
-                    "Criteria",
-                    list(
-                        criteria_options.keys()
-                    ),
-                    index=list(
-                        criteria_options.keys()
-                    ).index(
-                        current_criteria
+                        current_criteria = key
+
+                        break
+
+                with st.form(
+                    "edit_subcriteria"
+                ):
+
+                    edit_criteria = st.selectbox(
+                        "Criteria",
+                        list(
+                            criteria_options.keys()
+                        ),
+                        index=list(
+                            criteria_options.keys()
+                        ).index(
+                            current_criteria
+                        )
                     )
-                )
 
-                edit_code = st.text_input(
-                    "Kode Subcriteria",
-                    value=selected[
-                        "subcriteria_code"
-                    ]
-                )
-
-                edit_name = st.text_input(
-                    "Nama Subcriteria",
-                    value=selected[
-                        "subcriteria_name"
-                    ]
-                )
-
-                edit_target = st.number_input(
-                    "Target Value",
-                    min_value=1.0,
-                    max_value=5.0,
-                    value=float(
-                        selected[
-                            "target_value"
+                    edit_code = st.text_input(
+                        "Kode Subcriteria",
+                        value=selected[
+                            "subcriteria_code"
                         ]
-                    ),
-                    step=1.0
-                )
-
-                edit_factor = st.selectbox(
-                    "Factor Type",
-                    [
-                        "core",
-                        "secondary"
-                    ],
-                    index=0
-                    if selected[
-                        "factor_type"
-                    ] == "core"
-                    else 1
-                )
-
-                update_btn = (
-                    st.form_submit_button(
-                        "Update"
                     )
-                )
 
-            if update_btn:
+                    edit_name = st.text_input(
+                        "Nama Subcriteria",
+                        value=selected[
+                            "subcriteria_name"
+                        ]
+                    )
 
-                try:
+                    edit_target = st.number_input(
+                        "Target Value",
+                        min_value=1.0,
+                        max_value=5.0,
+                        value=float(
+                            selected[
+                                "target_value"
+                            ]
+                        ),
+                        step=1.0
+                    )
 
-                    supabase.table(
-                        "subcriteria"
-                    ).update({
-
-                        "criteria_id":
-                        criteria_options[
-                            edit_criteria
+                    edit_factor = st.selectbox(
+                        "Factor Type",
+                        [
+                            "core",
+                            "secondary"
                         ],
-
-                        "subcriteria_code":
-                        edit_code,
-
-                        "subcriteria_name":
-                        edit_name,
-
-                        "target_value":
-                        edit_target,
-
-                        "factor_type":
-                        edit_factor
-
-                    }).eq(
-                        "id",
-                        selected["id"]
-                    ).execute()
-
-                    st.success(
-                        "Subcriteria berhasil diupdate"
+                        index=0
+                        if selected[
+                            "factor_type"
+                        ] == "core"
+                        else 1
                     )
 
-                    st.rerun()
+                    update_btn = (
+                        st.form_submit_button(
+                            "Update"
+                        )
+                    )
 
-                except Exception as e:
+                if update_btn:
 
-                    st.error(e)
+                    try:
+
+                        supabase.table(
+                            "subcriteria"
+                        ).update({
+
+                            "criteria_id":
+                            criteria_options[
+                                edit_criteria
+                            ],
+
+                            "subcriteria_code":
+                            edit_code,
+
+                            "subcriteria_name":
+                            edit_name,
+
+                            "target_value":
+                            edit_target,
+
+                            "factor_type":
+                            edit_factor
+
+                        }).eq(
+                            "id",
+                            selected["id"]
+                        ).execute()
+
+                        st.success(
+                            "Subcriteria berhasil diupdate"
+                        )
+
+                        st.rerun()
+
+                    except Exception as e:
+
+                        st.error(e)
 
     # ==================================
     # TAB HAPUS
@@ -440,51 +459,58 @@ if is_admin:
             "Hapus Subcriteria"
         )
 
-        if len(subcriteria_data) == 0:
-
+        if not is_editable:
             st.info(
-                "Belum ada data"
+                "Subcriteria hanya dapat dihapus saat session DRAFT."
             )
 
         else:
 
-            selected_delete = st.selectbox(
+            if len(subcriteria_data) == 0:
 
-                "Pilih Subcriteria",
+                st.info(
+                    "Belum ada data"
+                )
 
-                subcriteria_data,
+            else:
 
-                format_func=lambda x:
-                f"{x['subcriteria_code']} - "
-                f"{x['subcriteria_name']}",
+                selected_delete = st.selectbox(
 
-                key="delete_subcriteria"
+                    "Pilih Subcriteria",
 
-            )
+                    subcriteria_data,
 
-            st.warning(
-                "Data yang dihapus tidak dapat dikembalikan."
-            )
+                    format_func=lambda x:
+                    f"{x['subcriteria_code']} - "
+                    f"{x['subcriteria_name']}",
 
-            if st.button(
-                "Hapus Subcriteria"
-            ):
+                    key="delete_subcriteria"
 
-                try:
+                )
 
-                    supabase.table(
-                        "subcriteria"
-                    ).delete().eq(
-                        "id",
-                        selected_delete["id"]
-                    ).execute()
+                st.warning(
+                    "Data yang dihapus tidak dapat dikembalikan."
+                )
 
-                    st.success(
-                        "Subcriteria berhasil dihapus"
-                    )
+                if st.button(
+                    "Hapus Subcriteria"
+                ):
 
-                    st.rerun()
+                    try:
 
-                except Exception as e:
+                        supabase.table(
+                            "subcriteria"
+                        ).delete().eq(
+                            "id",
+                            selected_delete["id"]
+                        ).execute()
 
-                    st.error(e)
+                        st.success(
+                            "Subcriteria berhasil dihapus"
+                        )
+
+                        st.rerun()
+
+                    except Exception as e:
+
+                        st.error(e)

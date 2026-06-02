@@ -66,6 +66,12 @@ selected_session = st.selectbox(
 )
 
 session_id = selected_session["id"]
+session_status = selected_session["status"]
+
+is_editable = (
+    is_admin
+    and session_status == "draft"
+)
 
 # ==================================
 # LOAD CRITERIA
@@ -165,71 +171,78 @@ if is_admin:
             "Tambah Criteria"
         )
 
-        with st.form(
-            "add_criteria_form"
-        ):
+        if not is_editable:
 
-            criteria_code = st.text_input(
-                "Kode Criteria",
-                placeholder="Kode"
+            st.info(
+                "Criteria hanya dapat ditambah saat session DRAFT."
             )
 
-            criteria_name = st.text_input(
-                "Nama Criteria",
-                placeholder="Kriteria"
-            )
+        else:
 
-            weight = st.number_input(
-                "Bobot",
-                min_value=0.0,
-                max_value=1.0,
-                step=0.01
-            )
+            with st.form(
+                "add_criteria_form"
+            ):
 
-            submit = st.form_submit_button(
-                "Simpan"
-            )
-
-        if submit:
-
-            if total_weight + weight > 1:
-
-                st.error(
-                    "Total bobot tidak boleh melebihi 1"
+                criteria_code = st.text_input(
+                    "Kode Criteria",
+                    placeholder="Kode"
                 )
 
-            else:
+                criteria_name = st.text_input(
+                    "Nama Criteria",
+                    placeholder="Kriteria"
+                )
 
-                try:
+                weight = st.number_input(
+                    "Bobot",
+                    min_value=0.0,
+                    max_value=1.0,
+                    step=0.01
+                )
 
-                    supabase.table(
-                        "criteria"
-                    ).insert({
+                submit = st.form_submit_button(
+                    "Simpan"
+                )
 
-                        "criteria_code":
-                        criteria_code,
+            if submit:
 
-                        "criteria_name":
-                        criteria_name,
+                if total_weight + weight > 1:
 
-                        "weight":
-                        weight,
-
-                        "session_id":
-                        session_id
-
-                    }).execute()
-
-                    st.success(
-                        "Criteria berhasil ditambahkan"
+                    st.error(
+                        "Total bobot tidak boleh melebihi 1"
                     )
 
-                    st.rerun()
+                else:
 
-                except Exception as e:
+                    try:
 
-                    st.error(e)
+                        supabase.table(
+                            "criteria"
+                        ).insert({
 
+                            "criteria_code":
+                            criteria_code,
+
+                            "criteria_name":
+                            criteria_name,
+
+                            "weight":
+                            weight,
+
+                            "session_id":
+                            session_id
+
+                        }).execute()
+
+                        st.success(
+                            "Criteria berhasil ditambahkan"
+                        )
+
+                        st.rerun()
+
+                    except Exception as e:
+
+                        st.error(e)
     # =============================
     # TAB EDIT
     # =============================
@@ -240,109 +253,116 @@ if is_admin:
             "Edit Criteria"
         )
 
-        if len(criteria_data) == 0:
-
+        if not is_editable:
             st.info(
-                "Belum ada data"
+                "Criteria hanya dapat diedit saat session DRAFT."
             )
 
         else:
 
-            selected = st.selectbox(
-                "Pilih Criteria",
-                criteria_data,
-                format_func=lambda x:
-                    f"{x['criteria_code']} - {x['criteria_name']}"
-            )
+            if len(criteria_data) == 0:
 
-            with st.form(
-                "edit_criteria_form"
-            ):
-
-                edit_code = st.text_input(
-                    "Kode Criteria",
-                    value=selected[
-                        "criteria_code"
-                    ]
+                st.info(
+                    "Belum ada data"
                 )
 
-                edit_name = st.text_input(
-                    "Nama Criteria",
-                    value=selected[
-                        "criteria_name"
-                    ]
+            else:
+
+                selected = st.selectbox(
+                    "Pilih Criteria",
+                    criteria_data,
+                    format_func=lambda x:
+                        f"{x['criteria_code']} - {x['criteria_name']}"
                 )
 
-                edit_weight = st.number_input(
-                    "Bobot",
-                    min_value=0.0,
-                    max_value=1.0,
-                    value=float(
-                        selected[
-                            "weight"
+                with st.form(
+                    "edit_criteria_form"
+                ):
+
+                    edit_code = st.text_input(
+                        "Kode Criteria",
+                        value=selected[
+                            "criteria_code"
                         ]
-                    ),
-                    step=0.01
-                )
-
-                update_btn = (
-                    st.form_submit_button(
-                        "Update"
-                    )
-                )
-
-            if update_btn:
-
-                try:
-
-                    other_weight = sum(
-                        float(
-                            row["weight"]
-                        )
-                        for row in criteria_data
-                        if row["id"]
-                        != selected["id"]
                     )
 
-                    if (
-                        other_weight
-                        + edit_weight
-                        > 1
-                    ):
+                    edit_name = st.text_input(
+                        "Nama Criteria",
+                        value=selected[
+                            "criteria_name"
+                        ]
+                    )
 
-                        st.error(
-                            "Total bobot tidak boleh melebihi 1"
+                    edit_weight = st.number_input(
+                        "Bobot",
+                        min_value=0.0,
+                        max_value=1.0,
+                        value=float(
+                            selected[
+                                "weight"
+                            ]
+                        ),
+                        step=0.01
+                    )
+
+                    update_btn = (
+                        st.form_submit_button(
+                            "Update"
+                        )
+                    )
+
+                if update_btn:
+
+                    try:
+
+                        other_weight = sum(
+                            float(
+                                row["weight"]
+                            )
+                            for row in criteria_data
+                            if row["id"]
+                            != selected["id"]
                         )
 
-                    else:
+                        if (
+                            other_weight
+                            + edit_weight
+                            > 1
+                        ):
 
-                        supabase.table(
-                            "criteria"
-                        ).update({
+                            st.error(
+                                "Total bobot tidak boleh melebihi 1"
+                            )
 
-                            "criteria_code":
-                            edit_code,
+                        else:
 
-                            "criteria_name":
-                            edit_name,
+                            supabase.table(
+                                "criteria"
+                            ).update({
 
-                            "weight":
-                            edit_weight
+                                "criteria_code":
+                                edit_code,
 
-                        }).eq(
-                            "id",
-                            selected["id"]
-                        ).execute()
+                                "criteria_name":
+                                edit_name,
 
-                        st.success(
-                            "Criteria berhasil diupdate"
-                        )
+                                "weight":
+                                edit_weight
 
-                        st.rerun()
+                            }).eq(
+                                "id",
+                                selected["id"]
+                            ).execute()
 
-                except Exception as e:
+                            st.success(
+                                "Criteria berhasil diupdate"
+                            )
 
-                    st.error(e)
+                            st.rerun()
+
+                    except Exception as e:
+
+                        st.error(e)
 
     # =============================
     # TAB HAPUS
@@ -354,45 +374,52 @@ if is_admin:
             "Hapus Criteria"
         )
 
-        if len(criteria_data) == 0:
-
+        if not is_editable:
             st.info(
-                "Belum ada data"
+                "Criteria hanya dapat dihapus saat session DRAFT."
             )
 
         else:
 
-            selected_delete = st.selectbox(
-                "Pilih Criteria",
-                criteria_data,
-                format_func=lambda x:
-                    f"{x['criteria_code']} - {x['criteria_name']}",
-                key="delete_criteria"
-            )
+            if len(criteria_data) == 0:
 
-            st.warning(
-                "Data yang dihapus tidak dapat dikembalikan."
-            )
+                st.info(
+                    "Belum ada data"
+                )
 
-            if st.button(
-                "Hapus Criteria"
-            ):
+            else:
 
-                try:
+                selected_delete = st.selectbox(
+                    "Pilih Criteria",
+                    criteria_data,
+                    format_func=lambda x:
+                        f"{x['criteria_code']} - {x['criteria_name']}",
+                    key="delete_criteria"
+                )
 
-                    supabase.table(
-                        "criteria"
-                    ).delete().eq(
-                        "id",
-                        selected_delete["id"]
-                    ).execute()
+                st.warning(
+                    "Data yang dihapus tidak dapat dikembalikan."
+                )
 
-                    st.success(
-                        "Criteria berhasil dihapus"
-                    )
+                if st.button(
+                    "Hapus Criteria"
+                ):
 
-                    st.rerun()
+                    try:
 
-                except Exception as e:
+                        supabase.table(
+                            "criteria"
+                        ).delete().eq(
+                            "id",
+                            selected_delete["id"]
+                        ).execute()
 
-                    st.error(e)
+                        st.success(
+                            "Criteria berhasil dihapus"
+                        )
+
+                        st.rerun()
+
+                    except Exception as e:
+
+                        st.error(e)
