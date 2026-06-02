@@ -65,7 +65,7 @@ session_id = selected_session["id"]
 # VALIDASI SESSION
 # =====================================
 
-if selected_session["status"] != "completed":
+if selected_session["status"] not in ["completed", "finalized"]:
 
     st.warning(
         "Borda hanya dapat dihitung pada session COMPLETED."

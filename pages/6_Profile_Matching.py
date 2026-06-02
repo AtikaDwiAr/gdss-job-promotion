@@ -111,7 +111,7 @@ else:
 # VALIDASI SESSION
 # =====================================
 
-if selected_session["status"] != "completed":
+if selected_session["status"] not in ["completed", "finalized"]:
 
     st.warning(
         "Profile Matching hanya dapat dihitung pada session COMPLETED."
