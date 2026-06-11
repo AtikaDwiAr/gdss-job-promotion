@@ -74,6 +74,22 @@ is_editable = (
 )
 
 # ==================================
+# AKSES DM
+# ==================================
+
+if (
+    not is_admin
+    and session_status == "draft"
+):
+
+    st.warning(
+        "Criteria belum dapat dilihat "
+        "karena session masih DRAFT."
+    )
+
+    st.stop()
+
+# ==================================
 # LOAD CRITERIA
 # ==================================
 

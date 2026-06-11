@@ -72,6 +72,19 @@ is_editable = (
     is_admin
     and session_status == "draft"
 )
+
+if (
+    not is_admin
+    and session_status == "draft"
+):
+
+    st.warning(
+        "Alternatives belum dapat dilihat "
+        "karena session masih DRAFT."
+    )
+
+    st.stop()
+
 # ==================================
 # LOAD ALTERNATIVES
 # ==================================
